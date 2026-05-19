@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/woff2/PretendardVariable.woff2")
+    format("woff2-variations");
+}
+
+:root {
+  --background: #fffaf1;
+  --foreground: #263238;
+  --primary: #f4bf5f;
+  --primary-foreground: #2b2b22;
+  --secondary: #d97896;
+  --secondary-foreground: #ffffff;
+  --accent: #6ebfc4;
+  --accent-foreground: #14343a;
+  --card: #ffffff;
+  --card-foreground: #263238;
+  --popover: #fff2df;
+  --popover-foreground: #263238;
+  --muted: #f7e7d4;
+  --muted-foreground: #8a5969;
+  --border: #e7cfae;
+  --input: #ffffff;
+  --ring: #42a9b0;
+  --destructive: #cf4b88;
+  --destructive-foreground: #ffffff;
+}
+
+.dark {
+  --background: #12242e;
+  --foreground: #f3e3ea;
+  --primary: #fbe2a7;
+  --primary-foreground: #12242e;
+  --secondary: #e4a2b1;
+  --secondary-foreground: #12242e;
+  --accent: #c67b96;
+  --accent-foreground: #f3e3ea;
+  --card: #1c2e38;
+  --card-foreground: #f3e3ea;
+  --popover: #20333d;
+  --popover-foreground: #f3e3ea;
+  --muted: #24272b;
+  --muted-foreground: #e4a2b1;
+  --border: #324859;
+  --input: #20333d;
+  --ring: #50afb6;
+  --destructive: #e35ea4;
+  --destructive-foreground: #12242e;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --font-sans: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "Cascadia Code", Consolas, "Liberation Mono", monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  overflow-wrap: break-word;
+  word-break: keep-all;
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.text-pretty {
+  text-wrap: pretty;
+}
