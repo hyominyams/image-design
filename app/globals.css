@@ -1,14 +1,5 @@
 @import "tailwindcss";
 
-@font-face {
-  font-family: "Pretendard";
-  font-weight: 45 920;
-  font-style: normal;
-  font-display: swap;
-  src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/woff2/PretendardVariable.woff2")
-    format("woff2-variations");
-}
-
 :root {
   --background: #fffaf1;
   --foreground: #263238;
@@ -73,7 +64,7 @@
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --font-sans: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-sans: "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-mono: "Cascadia Code", Consolas, "Liberation Mono", monospace;
 }
 

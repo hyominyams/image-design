@@ -18,7 +18,7 @@ type GenerateImageRequest = {
 };
 
 const dataUrlPattern = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/;
-const imageModel = "gpt-image-2";
+const defaultImageModel = "gpt-image-1.5";
 
 function parseDataUrl(dataUrl: string) {
   const match = dataUrl.match(dataUrlPattern);
@@ -97,7 +97,7 @@ function getOpenAIErrorMessage(error: unknown) {
 
   if (error.status === 403) {
     return {
-      status: 500,
+      status: 403,
       message:
         "이미지 생성 권한을 확인해 주세요. OpenAI 프로젝트 또는 조직 설정이 필요합니다.",
     };
@@ -184,37 +184,40 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const imageModel = process.env.OPENAI_IMAGE_MODEL ?? defaultImageModel;
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });
-  const imageFile =
-    imageBuffer && uploadedImage
-      ? await toFile(
-          imageBuffer,
-          `user-upload.${getImageExtension(uploadedImage.mimeType)}`,
-          { type: uploadedImage.mimeType },
-        )
-      : null;
-  const styleReferenceFiles = await getStyleReferenceFiles(
-    selectedStyle.referenceImages,
-  );
-  const imageInputs = [
-    ...(imageFile ? [imageFile] : []),
-    ...styleReferenceFiles,
-  ];
-
-  if (imageInputs.length > generationConfig.maxInputImageCount) {
-    return NextResponse.json(
-      { success: false, error: "Too many reference images." },
-      { status: 400 },
-    );
-  }
-  const imagePrompt = buildImagePrompt(selectedStyle, prompt, {
-    hasUploadedImage: Boolean(imageFile),
-    hasReferenceImages: selectedStyle.referenceImages.length > 0,
-  });
 
   try {
+    const imageFile =
+      imageBuffer && uploadedImage
+        ? await toFile(
+            imageBuffer,
+            `user-upload.${getImageExtension(uploadedImage.mimeType)}`,
+            { type: uploadedImage.mimeType },
+          )
+        : null;
+    const styleReferenceFiles = await getStyleReferenceFiles(
+      selectedStyle.referenceImages,
+    );
+    const imageInputs = [
+      ...(imageFile ? [imageFile] : []),
+      ...styleReferenceFiles,
+    ];
+
+    if (imageInputs.length > generationConfig.maxInputImageCount) {
+      return NextResponse.json(
+        { success: false, error: "Too many reference images." },
+        { status: 400 },
+      );
+    }
+
+    const imagePrompt = buildImagePrompt(selectedStyle, prompt, {
+      hasUploadedImage: Boolean(imageFile),
+      hasReferenceImages: selectedStyle.referenceImages.length > 0,
+    });
+
     const result =
       imageInputs.length > 0
         ? await openai.images.edit({
@@ -243,7 +246,10 @@ export async function POST(request: NextRequest) {
       mimeType: "image/png",
     });
   } catch (error) {
-    console.error(error);
+    console.error("Image generation failed", {
+      model: imageModel,
+      error,
+    });
     const openAIError = getOpenAIErrorMessage(error);
 
     return NextResponse.json(
