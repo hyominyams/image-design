@@ -57,13 +57,34 @@ export function addGeneratedImageHistory(item: GeneratedImageHistoryItem) {
 
   const nextHistory = [item, ...getGeneratedImageHistory()].slice(
     0,
-    generationConfig.maxCount,
+    generationConfig.maxHistoryCount,
   );
 
-  window.localStorage.setItem(
-    generationConfig.storageKeys.history,
-    JSON.stringify(nextHistory),
-  );
+  try {
+    window.localStorage.setItem(
+      generationConfig.storageKeys.history,
+      JSON.stringify(nextHistory),
+    );
 
-  return nextHistory;
+    return nextHistory;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "QuotaExceededError") {
+      const fallbackHistory = [item];
+      window.localStorage.removeItem(generationConfig.storageKeys.history);
+
+      try {
+        window.localStorage.setItem(
+          generationConfig.storageKeys.history,
+          JSON.stringify(fallbackHistory),
+        );
+
+        return fallbackHistory;
+      } catch {
+        window.localStorage.removeItem(generationConfig.storageKeys.history);
+        return [];
+      }
+    }
+
+    throw error;
+  }
 }

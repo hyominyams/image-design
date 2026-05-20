@@ -994,7 +994,7 @@ function StepThreePage({
             <p className="text-sm font-extrabold text-[#d16f91]">선택한 레퍼런스</p>
             <p className="text-xl font-extrabold">{selectedStyle?.name}</p>
             <p className="text-sm font-semibold leading-6 text-[#7c5566]">
-              완성되면 보관함에 저장됩니다. 이 기기에서 최대 5개까지 다시 볼 수 있어요.
+              완성되면 보관함에 저장됩니다. 이 기기에서 최근 2개까지 다시 볼 수 있어요.
             </p>
             <p className="rounded-md bg-white px-3 py-2 text-sm font-extrabold text-[#7c5566]">
               남은 생성 횟수 {remainingCount}/5
