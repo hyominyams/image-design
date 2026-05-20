@@ -18,7 +18,7 @@ type GenerateImageRequest = {
 };
 
 const dataUrlPattern = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/;
-const defaultImageModel = "gpt-image-1.5";
+const defaultImageModel = "gpt-image-2";
 
 function parseDataUrl(dataUrl: string) {
   const match = dataUrl.match(dataUrlPattern);

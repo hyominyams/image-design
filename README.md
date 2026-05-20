@@ -17,11 +17,11 @@ npm run dev
 
 ```bash
 OPENAI_API_KEY=your_api_key_here
-OPENAI_IMAGE_MODEL=gpt-image-1.5
+OPENAI_IMAGE_MODEL=gpt-image-2
 ```
 
 API 키는 프론트엔드에 노출되지 않고 `/api/generate-image` 서버 라우트에서만 사용됩니다.
-`OPENAI_IMAGE_MODEL`은 생략하면 `gpt-image-1.5`를 사용합니다.
+`OPENAI_IMAGE_MODEL`은 생략하면 `gpt-image-2`를 사용합니다.
 
 ## 주요 파일
 
