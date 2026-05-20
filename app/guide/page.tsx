@@ -72,7 +72,7 @@ export default function GuidePage() {
 
               <div className={`${softPanel} hidden p-3 md:block`}>
                 <Image
-                  alt="미술실에서 제품 아이디어를 설명하는 장면"
+                  alt="이미지 프롬프트 예시"
                   className="aspect-square w-full rounded-md border border-[#efd6ad] bg-white object-cover"
                   height={320}
                   priority
@@ -80,10 +80,10 @@ export default function GuidePage() {
                   width={320}
                 />
                 <p className="mt-4 text-pretty text-lg font-extrabold leading-7">
-                  그림 + 설명 = 더 실제 같은 제품 이미지
+                  프롬프트 + 참고 이미지
                 </p>
                 <p className="mt-2 text-pretty text-sm font-semibold leading-6 text-[#7c5566]">
-                  AI에게는 그림의 의도까지 말해 주는 것이 중요합니다.
+                  원하는 대상과 분위기를 함께 적으면 결과가 선명해집니다.
                 </p>
               </div>
             </div>
@@ -99,7 +99,7 @@ export default function GuidePage() {
                   {guideCopy.paletteTitle}
                 </h2>
                 <p className="mt-1 text-pretty text-sm font-semibold leading-6 text-[#7c5566]">
-                  색과 재료를 함께 쓰면 제품다운 느낌이 살아납니다.
+                  색과 질감을 함께 쓰면 이미지의 분위기가 또렷해집니다.
                 </p>
               </div>
             </div>
@@ -188,7 +188,7 @@ export default function GuidePage() {
                 {guideCopy.templateTitle}
               </h2>
               <p className="mt-1 text-pretty text-sm font-semibold leading-6 text-[#7c5566]">
-                빈칸만 채워도 AI에게 충분히 좋은 설명을 줄 수 있어요.
+                빈칸을 채우면 바로 생성할 수 있는 프롬프트가 됩니다.
               </p>
             </div>
           </div>
@@ -247,4 +247,3 @@ function ExampleCard({
     </article>
   );
 }
-

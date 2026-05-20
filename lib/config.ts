@@ -1,11 +1,14 @@
 export const generationConfig = {
   maxCount: 5,
   maxFileSizeBytes: 5 * 1024 * 1024,
+  maxReferenceFileSizeBytes: 512 * 1024,
+  maxInputImageCount: 16,
   acceptedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
   storageKeys: {
-    count: "student_ai_image_generation_count",
-    history: "student_ai_image_history",
-    theme: "student_ai_image_theme",
+    access: "general_ai_image_access",
+    count: "general_ai_image_generation_count",
+    history: "general_ai_image_history",
+    theme: "general_ai_image_theme",
   },
 } as const;
 

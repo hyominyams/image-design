@@ -8,6 +8,7 @@ import {
   Download,
   HelpCircle,
   ImagePlus,
+  KeyRound,
   Loader2,
   Lock,
   Palette,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import { accessCodes } from "@/lib/accessCodes";
 import { appCopy } from "@/lib/appContent";
 import { generationConfig, uploadConfig } from "@/lib/config";
 import { guideCopy } from "@/lib/guideContent";
@@ -27,7 +29,7 @@ import {
   getGenerationCount,
   setGenerationCount,
 } from "@/lib/localStorage";
-import { StylePreset, stylePresets } from "@/lib/stylePresets";
+import { StylePreset, styleCategories, stylePresets } from "@/lib/stylePresets";
 import { cn } from "@/lib/utils";
 
 type GeneratedImageResponse = {
@@ -48,21 +50,21 @@ const pageOrder: AppPage[] = ["home", "step-1", "step-2", "step-3"];
 const steps = [
   {
     page: "step-1" as const,
-    label: "업로드와 설명",
+    label: "이미지와 프롬프트",
     emoji: "🖼️",
-    description: "그림과 의도를 AI가 이해할 수 있게 준비해요.",
+    description: "참고 이미지는 선택하고, 만들 이미지는 프롬프트로 정해요.",
   },
   {
     page: "step-2" as const,
-    label: "스타일 정하기",
+    label: "레퍼런스 선택",
     emoji: "🎨",
-    description: "제품 사진, 시제품 렌더, 전시 모형 중 장면을 골라요.",
+    description: "없음 또는 원하는 시각 방향을 골라요.",
   },
   {
     page: "step-3" as const,
     label: "생성하고 저장",
     emoji: "✨",
-    description: "완성 이미지를 확인하고 보관함에 모아 둬요.",
+    description: "완성 이미지를 확인하고 보관함에 저장해요.",
   },
 ];
 
@@ -107,6 +109,8 @@ function getPageFromHash(): AppPage {
 
 export function ImageGenerationApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [hasCheckedAccess, setHasCheckedAccess] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
   const [page, setPage] = useState<AppPage>("home");
   const [uploadedImage, setUploadedImage] = useState<UploadedImage | null>(null);
   const [studentDescription, setStudentDescription] = useState("");
@@ -125,7 +129,7 @@ export function ImageGenerationApp() {
   );
   const remainingCount = Math.max(generationConfig.maxCount - generationCount, 0);
   const hasReachedLimit = generationCount >= generationConfig.maxCount;
-  const canOpenStyleStep = Boolean(uploadedImage && studentDescription.trim());
+  const canOpenStyleStep = Boolean(studentDescription.trim());
   const canOpenGenerateStep = Boolean(canOpenStyleStep && selectedStyle);
 
   useEffect(() => {
@@ -137,6 +141,8 @@ export function ImageGenerationApp() {
     };
 
     const frameId = window.requestAnimationFrame(() => {
+      setHasAccess(window.localStorage.getItem(generationConfig.storageKeys.access) === "granted");
+      setHasCheckedAccess(true);
       syncPageFromHash();
       setGenerationCountState(getGenerationCount());
       setHistory(getGeneratedImageHistory());
@@ -159,6 +165,16 @@ export function ImageGenerationApp() {
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
     setErrorMessage("");
+  }
+
+  function unlockWithCode(code: string) {
+    if (!accessCodes.some((accessCode) => accessCode === code)) {
+      return false;
+    }
+
+    window.localStorage.setItem(generationConfig.storageKeys.access, "granted");
+    setHasAccess(true);
+    return true;
   }
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -186,10 +202,6 @@ export function ImageGenerationApp() {
   }
 
   function validateStepOne() {
-    if (!uploadedImage) {
-      return appCopy.errors.imageRequired;
-    }
-
     if (!studentDescription.trim()) {
       return appCopy.errors.descriptionRequired;
     }
@@ -238,7 +250,7 @@ export function ImageGenerationApp() {
   async function handleGenerate() {
     const validationError = validateGenerate();
 
-    if (validationError || !uploadedImage || !selectedStyle) {
+    if (validationError || !selectedStyle) {
       setErrorMessage(validationError);
       setStatusMessage("");
       return;
@@ -255,8 +267,8 @@ export function ImageGenerationApp() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          uploadedImageBase64: uploadedImage.dataUrl,
-          studentDescription: studentDescription.trim(),
+          uploadedImageBase64: uploadedImage?.dataUrl,
+          prompt: studentDescription.trim(),
           styleId: selectedStyle.id,
         }),
       });
@@ -288,6 +300,14 @@ export function ImageGenerationApp() {
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  if (!hasCheckedAccess) {
+    return <main className="min-h-screen bg-[#fff7ea]" />;
+  }
+
+  if (!hasAccess) {
+    return <AccessCodePage onUnlock={unlockWithCode} />;
   }
 
   return (
@@ -363,6 +383,62 @@ export function ImageGenerationApp() {
   );
 }
 
+function AccessCodePage({ onUnlock }: { onUnlock: (code: string) => boolean }) {
+  const [code, setCode] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  function submitCode() {
+    const normalizedCode = code.replace(/\D/g, "").slice(0, 6);
+
+    if (normalizedCode.length !== 6 || !onUnlock(normalizedCode)) {
+      setErrorMessage("접속 코드를 확인해 주세요.");
+      return;
+    }
+
+    setErrorMessage("");
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#fff7ea] px-4 py-8 text-[#29323a]">
+      <section className="w-full max-w-md rounded-lg border border-[#efd6ad] bg-white p-5 shadow-[0_4px_0_#f0d7ab]">
+        <div className="flex size-12 items-center justify-center rounded-md bg-[#fff0d8] text-[#d16f91]">
+          <KeyRound className="size-6" />
+        </div>
+        <div className="mt-5">
+          <p className="text-sm font-extrabold text-[#d16f91]">AI 이미지 스튜디오</p>
+          <h1 className="mt-1 text-3xl font-extrabold leading-tight">접속 코드 입력</h1>
+          <p className="mt-2 text-sm font-semibold leading-6 text-[#7c5566]">
+            6자리 코드를 입력하면 이미지 생성 화면으로 이동합니다.
+          </p>
+        </div>
+        <label className="mt-5 block">
+          <span className="text-sm font-extrabold text-[#7c5566]">접속 코드</span>
+          <input
+            className="mt-2 h-14 w-full rounded-md border border-[#efd6ad] bg-white px-4 text-center text-2xl font-extrabold tracking-[0.28em] outline-none focus:border-[#6ebfc4] focus:ring-2 focus:ring-[#6ebfc4]/40"
+            inputMode="numeric"
+            maxLength={6}
+            onChange={(event) => {
+              setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+              setErrorMessage("");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                submitCode();
+              }
+            }}
+            placeholder="000000"
+            value={code}
+          />
+        </label>
+        {errorMessage && <AlertMessage>{errorMessage}</AlertMessage>}
+        <PrimaryButton className="mt-5 sm:w-full" onClick={submitCode}>
+          입장하기 <ArrowRight className="size-5" />
+        </PrimaryButton>
+      </section>
+    </main>
+  );
+}
+
 function AppHeader({
   currentPage,
   onGuideOpen,
@@ -377,9 +453,9 @@ function AppHeader({
   return (
     <header className="flex flex-col gap-3 rounded-lg border border-[#efd6ad] bg-white p-4 shadow-[0_4px_0_#f0d7ab] sm:flex-row sm:items-center sm:justify-between">
       <button className="text-left" onClick={onHome} type="button">
-        <p className="text-xs font-extrabold text-[#d16f91]">AI 제품 상상 미술시간</p>
+        <p className="text-xs font-extrabold text-[#d16f91]">AI 이미지 스튜디오</p>
         <h1 className="text-balance text-xl font-extrabold leading-tight sm:text-2xl">
-          나의 디자인을 실제 제품처럼 보기
+          프롬프트로 이미지 만들기
         </h1>
       </button>
 
@@ -393,7 +469,7 @@ function AppHeader({
           type="button"
         >
           <HelpCircle className="size-4" />
-          설명 도움
+          프롬프트 도움
         </button>
         {currentPage !== "home" && (
           <button
@@ -425,7 +501,7 @@ function HomePage({
           className="absolute inset-0 -z-20 h-full w-full object-cover opacity-[0.18]"
           height={920}
           priority
-          src="/styles/real-product.png"
+          src="/styles/poster.png"
           width={1280}
         />
         <div className="absolute inset-0 -z-10 bg-white/78" />
@@ -434,20 +510,20 @@ function HomePage({
           <div className="flex max-w-3xl flex-col justify-center gap-6">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-[#efd6ad] bg-[#fff0d8] px-3 py-1 text-sm font-extrabold text-[#d16f91]">
-                🎒 제품디자인 실험실
+                이미지 생성
               </span>
               <span className="rounded-full border border-[#c7e8e9] bg-[#e8fbfb] px-3 py-1 text-sm font-extrabold text-[#277077]">
-                그림에서 시제품까지
+                프롬프트 + 선택 이미지
               </span>
             </div>
 
             <div className="space-y-4">
               <h2 className="text-balance max-w-2xl text-[38px] font-extrabold leading-[1.12] tracking-normal text-[#202b33] sm:text-[54px] lg:text-[62px]">
-                상상 스케치를 제품 시안으로
+                원하는 장면을 이미지로
               </h2>
               <p className="text-pretty max-w-xl text-lg font-semibold leading-8 text-[#6f5a63]">
-                직접 그린 문, 도구, 공간 아이디어를 업로드하면 AI가 제품 사진,
-                3D 렌더, 전시 모형 같은 결과로 보여줍니다.
+                프롬프트를 쓰고 필요한 경우 참고 이미지를 더하세요. 레퍼런스 디자인은
+                사진, 포스터, 일러스트, 3D 렌더 같은 시각 방향을 잡아줍니다.
               </p>
             </div>
 
@@ -457,7 +533,7 @@ function HomePage({
                 onClick={onStart}
                 type="button"
               >
-                작품 올리고 시작하기 <ArrowRight className="size-5" />
+                이미지 만들기 <ArrowRight className="size-5" />
               </button>
               <button
                 className="inline-flex h-14 items-center justify-center gap-2 rounded-lg border-2 border-[#e7cfae] bg-white/92 px-7 text-base font-extrabold text-[#7c5566] transition-colors hover:bg-[#fff0d8]"
@@ -465,7 +541,7 @@ function HomePage({
                 type="button"
               >
                 <HelpCircle className="size-5" />
-                AI에게 설명하는 방법
+                프롬프트 도움
               </button>
             </div>
           </div>
@@ -473,25 +549,25 @@ function HomePage({
           <div className="grid content-center gap-3">
             <div className="rounded-xl border-2 border-[#e7cfae] bg-white/90 p-3 shadow-[0_5px_0_#f0d7ab]">
               <Image
-                alt="실제 제품처럼 렌더링된 학생 아이디어 예시"
+                alt="AI 이미지 생성 예시"
                 className="aspect-[4/3] w-full rounded-lg object-cover"
                 height={520}
                 priority
-                src="/styles/prototype-3d.png"
+                src="/styles/watercolor.png"
                 width={520}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg border border-[#efd6ad] bg-white/92 p-4">
-                <p className="text-sm font-extrabold text-[#d16f91]">결과</p>
+                <p className="text-sm font-extrabold text-[#d16f91]">입력</p>
                 <p className="mt-1 text-pretty text-base font-extrabold">
-                  실제 제품처럼 보기
+                  프롬프트 필수
                 </p>
               </div>
               <div className="rounded-lg border border-[#c7e8e9] bg-[#e8fbfb]/92 p-4">
-                <p className="text-sm font-extrabold text-[#277077]">보관</p>
+                <p className="text-sm font-extrabold text-[#277077]">참고</p>
                 <p className="mt-1 text-pretty text-base font-extrabold">
-                  최대 5개 저장
+                  이미지는 선택
                 </p>
               </div>
             </div>
@@ -607,7 +683,7 @@ function StepOnePage({
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[420px_1fr]">
-      <Panel title="그림 올리기" subtitle="직접 디자인한 물건 그림을 올려요.">
+      <Panel title="이미지 업로드" subtitle="참고 이미지는 선택 사항입니다.">
         <input
           accept={uploadConfig.acceptAttribute}
           className="hidden"
@@ -630,9 +706,9 @@ function StepOnePage({
               width={800}
             />
           ) : (
-            <span className="flex flex-col items-center gap-3 text-center text-[#9b6176]">
-              <Upload className="size-12" />
-              <span className="text-xl font-extrabold">이미지를 올려 주세요</span>
+              <span className="flex flex-col items-center gap-3 text-center text-[#9b6176]">
+                <Upload className="size-12" />
+              <span className="text-xl font-extrabold">참고 이미지 추가</span>
               <span className="text-sm font-semibold">jpg, png, webp / 최대 5MB</span>
             </span>
           )}
@@ -647,7 +723,7 @@ function StepOnePage({
         </button>
       </Panel>
 
-      <Panel title="설명 쓰기" subtitle="AI가 제품처럼 이해할 단서를 적어요.">
+      <Panel title="프롬프트 쓰기" subtitle="원하는 이미지를 직접 적어 주세요.">
         <textarea
           className="min-h-48 w-full rounded-lg border border-[#efd6ad] bg-white p-4 text-base font-semibold leading-7 outline-none placeholder:text-gray-500 focus:border-[#6ebfc4] focus:ring-2 focus:ring-[#6ebfc4]/40"
           maxLength={500}
@@ -656,7 +732,7 @@ function StepOnePage({
           value={studentDescription}
         />
         <div className="mt-3 rounded-lg border border-[#efd6ad] bg-[#fff0d8] p-4">
-          <p className="mb-3 text-sm font-extrabold text-[#d16f91]">좋은 설명 예시</p>
+          <p className="mb-3 text-sm font-extrabold text-[#d16f91]">프롬프트 예시</p>
           <div className="grid gap-2 text-sm font-semibold leading-6 text-[#7c5566] sm:grid-cols-3">
             {appCopy.description.exampleParts.map((part) => (
               <div className="rounded-md border border-[#efd6ad] bg-white p-3" key={part.label}>
@@ -675,13 +751,13 @@ function StepOnePage({
             onClick={onGuideOpen}
             type="button"
           >
-            설명 도움 보기
+            프롬프트 도움
           </button>
         </div>
         {errorMessage && <AlertMessage>{errorMessage}</AlertMessage>}
         <div className="mt-5 flex justify-end">
           <PrimaryButton onClick={onNext}>
-            다음: 스타일 정하기 <ArrowRight className="size-5" />
+            다음: 레퍼런스 선택 <ArrowRight className="size-5" />
           </PrimaryButton>
         </div>
       </Panel>
@@ -702,19 +778,50 @@ function StepTwoPage({
   selectedStyle?: StylePreset;
   selectedStyleId: string;
 }) {
+  const [selectedCategory, setSelectedCategory] = useState("전체");
+  const visibleStylePresets = useMemo(
+    () =>
+      selectedCategory === "전체"
+        ? stylePresets
+        : stylePresets.filter((style) => style.category === selectedCategory),
+    [selectedCategory],
+  );
+
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
       <Panel
         className="order-1 lg:order-1"
-        title="제품화 스타일 고르기"
-        subtitle="아이디어가 쓰일 산업 장면을 골라요."
+        title="레퍼런스 디자인"
+        subtitle="프롬프트에 어울리는 시각 방향을 선택해요."
       >
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {stylePresets.map((style) => (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {styleCategories.map((category) => (
+            <button
+              className={cn(
+                "h-9 rounded-md border px-3 text-sm font-extrabold transition-colors",
+                selectedCategory === category
+                  ? "border-[#d97896] bg-[#d97896] text-white"
+                  : "border-[#efd6ad] bg-[#fff0d8] text-[#7c5566] hover:bg-[#f7e7d4]",
+              )}
+              key={category}
+              onClick={() => setSelectedCategory(category)}
+              type="button"
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+
+        <div className="mb-3 text-sm font-extrabold text-[#7c5566]">
+          {visibleStylePresets.length}개 레퍼런스
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {visibleStylePresets.map((style) => (
             <button
               aria-pressed={style.id === selectedStyleId}
               className={cn(
-                "relative grid h-full min-h-[236px] grid-rows-[auto_1fr] overflow-hidden rounded-lg border bg-white text-left transition-colors",
+                "relative grid h-full min-h-[260px] grid-rows-[auto_1fr] overflow-hidden rounded-lg border bg-white text-left transition-colors",
                 style.id === selectedStyleId
                   ? "border-[#f4bf5f] shadow-[0_0_0_3px_#f4bf5f]"
                   : "border-[#efd6ad] hover:border-[#6ebfc4]",
@@ -728,14 +835,20 @@ function StepTwoPage({
                   <CheckCircle2 className="size-5" />
                 </span>
               )}
-              <Image
-                alt={`${style.name} 썸네일`}
-                className="aspect-[4/3] w-full object-cover"
-                height={240}
-                src={style.thumbnail}
-                width={320}
-              />
-              <div className="flex min-h-28 flex-col p-3">
+              {style.thumbnail ? (
+                <Image
+                  alt={`${style.name} 썸네일`}
+                  className="aspect-[3/4] w-full object-cover"
+                  height={320}
+                  src={style.thumbnail}
+                  width={240}
+                />
+              ) : (
+                <div className="flex aspect-[3/4] w-full items-center justify-center bg-[#fff0d8] text-[#9b6176]">
+                  <Palette className="size-12" />
+                </div>
+              )}
+              <div className="flex min-h-24 flex-col p-3">
                 <p className="text-pretty font-extrabold">{style.name}</p>
                 <p className="mt-1 text-pretty text-sm font-semibold leading-5 text-[#7c5566]">
                   {style.description}
@@ -756,19 +869,25 @@ function StepTwoPage({
       </Panel>
 
       <Panel
-        className="order-2 lg:order-2"
-        title="선택한 스타일"
-        subtitle="이 모습으로 제품화해 볼게요."
+        className="order-2 lg:sticky lg:top-4 lg:order-2 lg:self-start"
+        title="선택한 레퍼런스"
+        subtitle="이 방향을 결과에 반영합니다."
       >
         {selectedStyle && (
           <>
-            <Image
-              alt={`${selectedStyle.name} 미리보기`}
-              className="aspect-square w-full rounded-lg border border-[#efd6ad] object-cover"
-              height={520}
-              src={selectedStyle.thumbnail}
-              width={520}
-            />
+            {selectedStyle.thumbnail ? (
+              <Image
+                alt={`${selectedStyle.name} 미리보기`}
+                className="aspect-[3/4] w-full rounded-lg border border-[#efd6ad] object-cover"
+                height={520}
+                src={selectedStyle.thumbnail}
+                width={390}
+              />
+            ) : (
+              <div className="flex aspect-[3/4] w-full items-center justify-center rounded-lg border border-[#efd6ad] bg-[#fff0d8] text-[#9b6176]">
+                <Palette className="size-16" />
+              </div>
+            )}
             <h2 className="mt-4 text-2xl font-extrabold">{selectedStyle.name}</h2>
             <p className="mt-2 text-pretty text-base font-semibold leading-7 text-[#7c5566]">
               {selectedStyle.description}
@@ -809,7 +928,7 @@ function StepThreePage({
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
-      <Panel title="3단계. 생성하기" subtitle="여러 번 시도해 보고 마음에 드는 이미지를 저장해요.">
+      <Panel title="이미지 생성" subtitle="완성 이미지를 확인하고 저장해요.">
         <div className="grid gap-4 md:grid-cols-[1fr_260px]">
           <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-[#efd6ad] bg-[#fff0d8]">
             {generatedImageUrl ? (
@@ -824,13 +943,13 @@ function StepThreePage({
             ) : (
               <div className="text-center text-[#9b6176]">
                 <Palette className="mx-auto size-16" />
-                <p className="mt-3 text-xl font-extrabold">완성 이미지가 여기에 보여요</p>
+                <p className="mt-3 text-xl font-extrabold">완성 이미지가 여기에 표시됩니다</p>
               </div>
             )}
           </div>
 
           <div className="space-y-3 rounded-lg border border-[#efd6ad] bg-[#fff0d8] p-4">
-            <p className="text-sm font-extrabold text-[#d16f91]">선택한 스타일</p>
+            <p className="text-sm font-extrabold text-[#d16f91]">선택한 레퍼런스</p>
             <p className="text-xl font-extrabold">{selectedStyle?.name}</p>
             <p className="text-sm font-semibold leading-6 text-[#7c5566]">
               완성되면 보관함에 저장됩니다. 이 기기에서 최대 5개까지 다시 볼 수 있어요.
@@ -864,7 +983,7 @@ function StepThreePage({
         <div className="mt-5">
           <SecondaryButton className="sm:w-full" onClick={onBack}>
             <ArrowLeft className="size-5" />
-            스타일 다시 고르기
+            레퍼런스 다시 고르기
           </SecondaryButton>
         </div>
       </Panel>
@@ -1007,7 +1126,7 @@ function GuideModal({ onClose }: { onClose: () => void }) {
       <div className="mx-auto max-h-[calc(100vh-2rem)] max-w-2xl overflow-auto rounded-lg border border-[#efd6ad] bg-white p-5 shadow-[0_4px_0_#f0d7ab]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-extrabold text-[#d16f91]">디자인 설명 가이드</p>
+            <p className="text-sm font-extrabold text-[#d16f91]">프롬프트 가이드</p>
             <h2 className="text-2xl font-extrabold">{guideCopy.title}</h2>
             <p className="mt-2 text-sm font-semibold leading-6 text-[#7c5566]">
               {guideCopy.description}
@@ -1044,4 +1163,3 @@ function GuideModal({ onClose }: { onClose: () => void }) {
     </div>
   );
 }
-

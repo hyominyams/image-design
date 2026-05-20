@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import OpenAI, { toFile } from "openai";
 
@@ -12,6 +12,7 @@ export const maxDuration = 120;
 
 type GenerateImageRequest = {
   uploadedImageBase64?: string;
+  prompt?: string;
   studentDescription?: string;
   styleId?: string;
 };
@@ -58,6 +59,12 @@ function getMimeTypeFromPath(filePath: string) {
 async function getStyleReferenceFile(imagePath: string) {
   const relativePath = imagePath.replace(/^\/+/, "");
   const referencePath = join(process.cwd(), "public", relativePath);
+  const referenceStats = await stat(referencePath);
+
+  if (referenceStats.size > generationConfig.maxReferenceFileSizeBytes) {
+    throw new Error(`Style reference image is too large: ${imagePath}`);
+  }
+
   const referenceBuffer = await readFile(referencePath);
   const mimeType = getMimeTypeFromPath(referencePath);
 
@@ -84,26 +91,22 @@ export async function POST(request: NextRequest) {
   const uploadedImage = body.uploadedImageBase64
     ? parseDataUrl(body.uploadedImageBase64)
     : null;
-  const studentDescription = body.studentDescription?.trim() ?? "";
-  const selectedStyle = body.styleId ? getStylePreset(body.styleId) : null;
+  const prompt = (body.prompt ?? body.studentDescription)?.trim() ?? "";
+  const selectedStyle = getStylePreset(body.styleId ?? "none");
 
-  if (!uploadedImage) {
-    return NextResponse.json(
-      { success: false, error: "A valid image file is required." },
-      { status: 400 },
-    );
-  }
-
-  if (!generationConfig.acceptedMimeTypes.includes(uploadedImage.mimeType as never)) {
+  if (
+    uploadedImage &&
+    !generationConfig.acceptedMimeTypes.includes(uploadedImage.mimeType as never)
+  ) {
     return NextResponse.json(
       { success: false, error: "Unsupported image type." },
       { status: 400 },
     );
   }
 
-  if (!studentDescription) {
+  if (!prompt) {
     return NextResponse.json(
-      { success: false, error: "Student description is required." },
+      { success: false, error: "Prompt is required." },
       { status: 400 },
     );
   }
@@ -115,9 +118,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const imageBuffer = Buffer.from(uploadedImage.base64, "base64");
+  const imageBuffer = uploadedImage
+    ? Buffer.from(uploadedImage.base64, "base64")
+    : null;
 
-  if (imageBuffer.byteLength > generationConfig.maxFileSizeBytes) {
+  if (imageBuffer && imageBuffer.byteLength > generationConfig.maxFileSizeBytes) {
     return NextResponse.json(
       { success: false, error: "Image file is too large." },
       { status: 400 },
@@ -127,24 +132,50 @@ export async function POST(request: NextRequest) {
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });
-  const imageFile = await toFile(
-    imageBuffer,
-    `student-upload.${getImageExtension(uploadedImage.mimeType)}`,
-    { type: uploadedImage.mimeType },
-  );
+  const imageFile =
+    imageBuffer && uploadedImage
+      ? await toFile(
+          imageBuffer,
+          `user-upload.${getImageExtension(uploadedImage.mimeType)}`,
+          { type: uploadedImage.mimeType },
+        )
+      : null;
   const styleReferenceFiles = await getStyleReferenceFiles(
     selectedStyle.referenceImages,
   );
+  const imageInputs = [
+    ...(imageFile ? [imageFile] : []),
+    ...styleReferenceFiles,
+  ];
+
+  if (imageInputs.length > generationConfig.maxInputImageCount) {
+    return NextResponse.json(
+      { success: false, error: "Too many reference images." },
+      { status: 400 },
+    );
+  }
+  const imagePrompt = buildImagePrompt(selectedStyle, prompt, {
+    hasUploadedImage: Boolean(imageFile),
+    hasReferenceImages: selectedStyle.referenceImages.length > 0,
+  });
 
   try {
-    const result = await openai.images.edit({
-      image: [imageFile, ...styleReferenceFiles],
-      input_fidelity: "high",
-      model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5",
-      output_format: "png",
-      prompt: buildImagePrompt(selectedStyle, studentDescription),
-      size: "1024x1024",
-    });
+    const result =
+      imageInputs.length > 0
+        ? await openai.images.edit({
+            image: imageInputs,
+            input_fidelity: "high",
+            model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5",
+            output_format: "png",
+            prompt: imagePrompt,
+            size: "1024x1024",
+          })
+        : await openai.images.generate({
+            model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5",
+            output_format: "png",
+            prompt: imagePrompt,
+            size: "1024x1024",
+          });
     const imageBase64 = result.data?.[0]?.b64_json;
 
     if (!imageBase64) {

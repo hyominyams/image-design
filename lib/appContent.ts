@@ -1,27 +1,27 @@
 export const appCopy = {
   metadata: {
-    title: "나의 디자인을 실제 제품처럼 보기",
+    title: "AI 이미지 스튜디오",
     description:
-      "학생이 직접 디자인한 상상 물건을 업로드하고 설명과 제품화 스타일을 선택해 실제 개발된 물품처럼 보는 수업용 웹앱입니다.",
+      "프롬프트와 선택 이미지, 레퍼런스 디자인을 바탕으로 이미지를 생성하는 웹앱입니다.",
   },
   hero: {
-    eyebrow: "AI 제품 상상 미술시간",
-    title: "나의 디자인을 실제 제품처럼 보기",
+    eyebrow: "AI 이미지 스튜디오",
+    title: "프롬프트로 이미지 만들기",
     description:
-      "내가 그린 상상 물건을 올리고 설명과 제품화 스타일을 고르면, 실제로 개발된 물품 같은 이미지가 완성됩니다.",
-    guideCta: "AI에게 설명하는 방법",
+      "원하는 장면을 적고 필요한 이미지를 더하면 사진, 포스터, 일러스트 같은 결과를 만들 수 있습니다.",
+    guideCta: "프롬프트 도움",
   },
   nav: [
     { id: "upload", label: "업로드" },
-    { id: "description", label: "설명" },
-    { id: "styles", label: "스타일" },
+    { id: "description", label: "프롬프트" },
+    { id: "styles", label: "레퍼런스" },
     { id: "result", label: "결과" },
     { id: "gallery", label: "보관함" },
   ],
   steps: [
-    "디자인 그림 올리기",
-    "물건 설명 쓰기",
-    "제품화 스타일 선택",
+    "이미지 추가",
+    "프롬프트 쓰기",
+    "레퍼런스 디자인 선택",
     "AI 이미지 만들기",
     "완성 이미지 받기",
   ],
@@ -33,45 +33,45 @@ export const appCopy = {
   },
   upload: {
     title: "1. 이미지 업로드",
-    description: "직접 디자인한 물건 그림을 올려요.",
+    description: "필요한 경우 참고 이미지를 올려요.",
     button: "이미지 고르기",
     helper: "이미지 파일은 5MB 이하로 올려 주세요.",
-    empty: "내가 디자인한 물건 그림을 올려요",
+    empty: "참고 이미지가 있으면 올려요",
   },
   description: {
-    title: "2. 설명 작성",
-    placeholder: "무엇을 위해 쓰는 물건인지, 꼭 남길 모양과 색을 적어 주세요.",
+    title: "2. 프롬프트 작성",
+    placeholder: "만들고 싶은 이미지의 대상, 분위기, 색감, 구도, 용도를 적어 주세요.",
     example:
-      "예시: 이 물건은 비 오는 날 책가방을 젖지 않게 지켜주는 자동 우산 문입니다. 문처럼 열리고 닫히며, 노란 손잡이와 둥근 파란 몸체가 꼭 남아야 합니다. 부드러운 플라스틱 제품처럼 보이면 좋겠습니다.",
+      "예시: 햇빛이 들어오는 작은 작업실 책상 위에 세라믹 머그컵과 스케치북이 놓인 사진. 따뜻한 자연광, 차분한 색감, 잡지 화보 같은 구도.",
     exampleParts: [
       {
-        label: "목적",
-        text: "비 오는 날 책가방을 젖지 않게 지켜요.",
+        label: "대상",
+        text: "무엇이 중심에 보여야 하는지 적어요.",
       },
       {
-        label: "모양",
-        text: "문처럼 열리고, 노란 손잡이와 둥근 파란 몸체가 있어요.",
+        label: "분위기",
+        text: "밝고 따뜻한지, 차분한지, 역동적인지 정해요.",
       },
       {
-        label: "재료",
-        text: "부드러운 플라스틱 제품처럼 보이면 좋겠어요.",
+        label: "구도",
+        text: "가까운 장면, 넓은 장면, 정면, 위에서 본 장면처럼 적어요.",
       },
     ],
   },
   styles: {
-    title: "3. 스타일 선택",
-    description: "내 디자인을 어떤 제품 모습으로 볼지 선택해요.",
+    title: "3. 레퍼런스 디자인 선택",
+    description: "결과에 어울리는 시각 방향을 선택해요.",
   },
   counter: {
     title: "남은 생성 횟수",
     limitNotice:
-      "이미지는 최대 5번까지 만들 수 있어요. 신중하게 설명을 작성한 뒤 생성해 주세요.",
+      "이미지는 최대 5번까지 만들 수 있어요. 프롬프트를 확인한 뒤 생성해 주세요.",
     storageNotice:
       "이 제한은 브라우저에 저장되므로 브라우저 데이터 삭제 시 초기화될 수 있습니다.",
   },
   actions: {
     generate: "AI 이미지 생성하기",
-    generating: "AI가 내 디자인을 실제 제품처럼 만들고 있어요. 잠시만 기다려 주세요.",
+    generating: "AI가 이미지를 만들고 있어요. 잠시만 기다려 주세요.",
     download: "이미지 다운로드",
     resetResult: "결과 지우기",
   },
@@ -86,9 +86,9 @@ export const appCopy = {
     empty: "아직 저장된 완성 이미지가 없어요.",
   },
   errors: {
-    imageRequired: "먼저 이미지를 업로드해 주세요.",
-    descriptionRequired: "내가 디자인한 물건에 대한 설명을 작성해 주세요.",
-    styleRequired: "원하는 제품화 스타일을 선택해 주세요.",
+    imageRequired: "참고 이미지를 다시 확인해 주세요.",
+    descriptionRequired: "프롬프트를 작성해 주세요.",
+    styleRequired: "레퍼런스 디자인을 선택해 주세요.",
     limitReached: "이미지 생성 가능 횟수를 모두 사용했습니다.",
     fileTooLarge: "이미지 파일 크기는 5MB 이하로 올려 주세요.",
     invalidFileType: "jpg, png, webp 형식의 이미지만 올릴 수 있습니다.",
