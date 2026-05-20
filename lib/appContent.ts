@@ -82,7 +82,7 @@ export const appCopy = {
   },
   history: {
     title: "완성 이미지 보관함",
-    description: "이 기기에서 최대 5개까지 다시 볼 수 있어요.",
+    description: "이 기기에서 최근 2개까지 다시 볼 수 있어요.",
     empty: "아직 저장된 완성 이미지가 없어요.",
   },
   errors: {

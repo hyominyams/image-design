@@ -968,6 +968,8 @@ function StepThreePage({
   studentDescription: string;
   uploadedImage: UploadedImage | null;
 }) {
+  const savedHistory = history.filter((item) => item.imageUrl !== generatedImageUrl);
+
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
       <Panel title="이미지 생성" subtitle="완성 이미지를 확인하고 저장해요.">
@@ -1031,9 +1033,9 @@ function StepThreePage({
       </Panel>
 
       <Panel title="완성 이미지 보관함" subtitle={appCopy.history.description}>
-        {history.length > 0 ? (
+        {savedHistory.length > 0 ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            {history.map((item) => (
+            {savedHistory.map((item) => (
               <div
                 className="overflow-hidden rounded-lg border border-[#efd6ad] bg-white"
                 key={item.id}
