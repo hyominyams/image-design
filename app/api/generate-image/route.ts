@@ -243,7 +243,6 @@ export async function POST(request: NextRequest) {
       imageInputs.length > 0
         ? await openai.images.edit({
             image: imageInputs,
-            input_fidelity: "high",
             model: imageModel,
             output_format: "png",
             prompt: imagePrompt,
