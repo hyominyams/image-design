@@ -792,7 +792,7 @@ function StepTwoPage({
   );
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
+    <div className="grid gap-4 pb-28 lg:grid-cols-[1fr_340px] lg:pb-32">
       <Panel
         className="order-1 lg:order-1"
         title="레퍼런스 디자인"
@@ -899,6 +899,44 @@ function StepTwoPage({
           </>
         )}
       </Panel>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#efd6ad] bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_16px_rgba(41,50,58,0.12)] backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          <SecondaryButton className="hidden shrink-0 sm:inline-flex" onClick={onBack}>
+            <ArrowLeft className="size-5" />
+            이전
+          </SecondaryButton>
+
+          <div className="flex min-w-0 flex-1 items-center gap-3 rounded-md border border-[#efd6ad] bg-[#fff0d8] p-2">
+            {selectedStyle?.thumbnail ? (
+              <Image
+                alt=""
+                aria-hidden="true"
+                className="size-12 shrink-0 rounded-md object-cover"
+                height={48}
+                src={selectedStyle.thumbnail}
+                width={48}
+              />
+            ) : (
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-md bg-white text-[#9b6176]">
+                <Palette className="size-6" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-xs font-extrabold text-[#d16f91]">
+                {selectedStyle?.category}
+              </p>
+              <p className="truncate text-sm font-extrabold text-[#29323a] sm:text-base">
+                {selectedStyle?.name}
+              </p>
+            </div>
+          </div>
+
+          <PrimaryButton className="w-auto shrink-0 px-4 sm:px-6" onClick={onNext}>
+            생성 단계로 <ArrowRight className="size-5" />
+          </PrimaryButton>
+        </div>
+      </div>
     </div>
   );
 }
