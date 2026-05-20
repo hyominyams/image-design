@@ -326,6 +326,14 @@ export const stylePresets: StylePreset[] = [
       "paper diorama miniature, folded paper layers, crafted shadows, small theatrical scene",
   }),
   createReferencePreset({
+    id: "ceramic-craft",
+    name: "도자기 공예",
+    description: "손맛 있는 유약과 흙 질감",
+    category: "공예",
+    prompt:
+      "handmade ceramic craft style, glazed clay surface, rounded imperfect forms, tactile material detail, soft studio lighting",
+  }),
+  createReferencePreset({
     id: "stained-glass",
     name: "스테인드글라스",
     description: "빛나는 유리 조각 표현",
@@ -374,6 +382,14 @@ export const stylePresets: StylePreset[] = [
       "ink wash illustration, expressive brush lines, diluted color, calm atmospheric negative space",
   }),
   createReferencePreset({
+    id: "natural-history-plate",
+    name: "자연도감",
+    description: "세밀한 관찰화와 담채",
+    category: "회화",
+    prompt:
+      "vintage natural history plate illustration, refined ink outlines, delicate watercolor fills, careful observational detail, balanced specimen layout",
+  }),
+  createReferencePreset({
     id: "pastel-chalk",
     name: "파스텔",
     description: "분필 같은 부드러운 색감",
@@ -404,6 +420,14 @@ export const stylePresets: StylePreset[] = [
     category: "그래픽",
     prompt:
       "educational infographic style, clear visual structure, simple icons, organized explanatory layout",
+  }),
+  createReferencePreset({
+    id: "technical-blueprint",
+    name: "설계도 드로잉",
+    description: "정밀한 선과 도면 구도",
+    category: "그래픽",
+    prompt:
+      "technical blueprint drawing style, precise thin blue ink linework, orthographic and perspective views, construction lines, clean drafting paper texture",
   }),
   createReferencePreset({
     id: "fashion-editorial",
