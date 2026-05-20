@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import OpenAI, { toFile } from "openai";
+import OpenAI, { APIError, toFile } from "openai";
 
 import { generationConfig } from "@/lib/config";
 import { buildImagePrompt } from "@/lib/imagePrompt";
@@ -18,6 +18,7 @@ type GenerateImageRequest = {
 };
 
 const dataUrlPattern = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/;
+const imageModel = "gpt-image-2";
 
 function parseDataUrl(dataUrl: string) {
   const match = dataUrl.match(dataUrlPattern);
@@ -79,10 +80,64 @@ async function getStyleReferenceFiles(imagePaths: string[]) {
   return Promise.all(imagePaths.map((imagePath) => getStyleReferenceFile(imagePath)));
 }
 
+function getOpenAIErrorMessage(error: unknown) {
+  if (!(error instanceof APIError)) {
+    return {
+      status: 500,
+      message: "이미지 생성 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+    };
+  }
+
+  if (error.status === 401) {
+    return {
+      status: 500,
+      message: "이미지 생성 설정을 확인해 주세요. API 키가 올바르지 않습니다.",
+    };
+  }
+
+  if (error.status === 403) {
+    return {
+      status: 500,
+      message:
+        "이미지 생성 권한을 확인해 주세요. OpenAI 프로젝트 또는 조직 설정이 필요합니다.",
+    };
+  }
+
+  if (error.status === 404) {
+    return {
+      status: 500,
+      message: "이미지 생성 모델을 찾을 수 없습니다. 배포된 모델 설정을 확인해 주세요.",
+    };
+  }
+
+  if (error.status === 429) {
+    return {
+      status: 429,
+      message: "이미지 생성 요청이 많습니다. 잠시 후 다시 시도해 주세요.",
+    };
+  }
+
+  if (error.status && error.status >= 500) {
+    return {
+      status: 502,
+      message: "OpenAI 서비스 응답이 불안정합니다. 잠시 후 다시 시도해 주세요.",
+    };
+  }
+
+  return {
+    status: 500,
+    message: "이미지 생성 요청을 처리하지 못했습니다. 입력 내용을 확인해 주세요.",
+  };
+}
+
 export async function POST(request: NextRequest) {
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
-      { success: false, error: "OPENAI_API_KEY is not configured." },
+      {
+        success: false,
+        error:
+          "이미지 생성 설정이 필요합니다. OPENAI_API_KEY 환경 변수를 추가한 뒤 서버를 다시 시작해 주세요.",
+      },
       { status: 500 },
     );
   }
@@ -165,13 +220,13 @@ export async function POST(request: NextRequest) {
         ? await openai.images.edit({
             image: imageInputs,
             input_fidelity: "high",
-            model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5",
+            model: imageModel,
             output_format: "png",
             prompt: imagePrompt,
             size: "1024x1024",
           })
         : await openai.images.generate({
-            model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1.5",
+            model: imageModel,
             output_format: "png",
             prompt: imagePrompt,
             size: "1024x1024",
@@ -189,10 +244,11 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error(error);
+    const openAIError = getOpenAIErrorMessage(error);
 
     return NextResponse.json(
-      { success: false, error: "이미지 생성에 실패했습니다." },
-      { status: 500 },
+      { success: false, error: openAIError.message },
+      { status: openAIError.status },
     );
   }
 }

@@ -273,10 +273,12 @@ export function ImageGenerationApp() {
         }),
       });
 
-      const result = (await response.json()) as GeneratedImageResponse;
+      const result = (await response.json().catch(() => null)) as
+        | GeneratedImageResponse
+        | null;
 
-      if (!response.ok || !result.success || !result.imageBase64) {
-        throw new Error(result.error ?? appCopy.errors.generationFailed);
+      if (!response.ok || !result?.success || !result.imageBase64) {
+        throw new Error(result?.error ?? appCopy.errors.generationFailed);
       }
 
       const imageUrl = getBase64ImageUrl(result.imageBase64, result.mimeType);
@@ -294,8 +296,10 @@ export function ImageGenerationApp() {
       setHistory(addGeneratedImageHistory(historyItem));
       setGeneratedImageUrl(imageUrl);
       setStatusMessage("완성 이미지가 보관함에 저장되었어요.");
-    } catch {
-      setErrorMessage(appCopy.errors.generationFailed);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : appCopy.errors.generationFailed,
+      );
       setStatusMessage("");
     } finally {
       setIsGenerating(false);
