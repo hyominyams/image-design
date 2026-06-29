@@ -654,7 +654,7 @@ function HomePage({
   onStart: () => void;
   selectedStyle?: StylePreset;
 }) {
-  const recentHistory = history.slice(0, 2);
+  const recentHistory = history.slice(0, 5);
 
   return (
     <section className="space-y-5">
@@ -671,46 +671,49 @@ function HomePage({
         <div className="absolute inset-0 -z-10 bg-[#fffdfa]/86" />
 
         <div className="grid min-h-[620px] gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_430px] lg:p-7">
-          <div className="flex min-w-0 flex-col justify-between rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/72 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] sm:p-7">
-            <div>
-              <div className="mb-10 flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-col gap-4">
+            <div className="relative min-h-[440px] flex-1 overflow-hidden rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/68 shadow-[var(--studio-shadow-xs)]">
+              <Image
+                alt="밝은 쇼룸 작업 공간"
+                className="h-full w-full object-cover"
+                fill
+                priority
+                sizes="(min-width: 1024px) calc(100vw - 620px), 100vw"
+                src={studioAssets.hero}
+              />
+              <div className="absolute left-4 top-4 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-2">
                 {appCopy.nav.slice(0, 4).map((item) => (
                   <span
-                    className="rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/74 px-3 py-1.5 text-sm font-bold text-[var(--studio-subtle)]"
+                    className="rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/86 px-3 py-1.5 text-sm font-bold text-[var(--studio-subtle)] shadow-[var(--studio-shadow-xs)]"
                     key={item.id}
                   >
                     {item.label}
                   </span>
                 ))}
               </div>
-
-              <p className="text-sm font-extrabold uppercase tracking-[0.2em] text-[var(--studio-clay)]">
-                {appCopy.hero.eyebrow}
-              </p>
-              <h2 className="mt-4 max-w-4xl text-balance text-[38px] font-extrabold leading-[1.04] tracking-normal text-[var(--studio-ink)] sm:text-[62px] lg:text-[76px]">
-                밝은 쇼룸에서 이미지를 만드세요
-              </h2>
-              <p className="mt-6 max-w-2xl text-pretty text-base font-semibold leading-7 text-[var(--studio-subtle)] sm:text-lg sm:leading-8">
-                프롬프트와 레퍼런스를 놓고, 결과를 확인하고, 완성 이미지를 보관하세요.
-              </p>
             </div>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/76 p-3 shadow-[var(--studio-shadow-xs)] sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-bold leading-6 text-[var(--studio-subtle)]">
+                프롬프트와 레퍼런스를 준비하고 바로 생성하세요.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
               <button
-                className="studio-button-primary inline-flex h-[52px] min-h-[52px] items-center justify-center gap-2 rounded-md px-6 text-base font-extrabold transition-transform hover:-translate-y-0.5"
+                className="studio-button-primary inline-flex h-11 min-h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-extrabold transition-transform hover:-translate-y-0.5"
                 onClick={onStart}
                 type="button"
               >
-                작업 시작 <ArrowRight className="size-5" />
+                작업 시작 <ArrowRight className="size-4" />
               </button>
               <button
-                className="studio-button-secondary inline-flex h-[52px] min-h-[52px] items-center justify-center gap-2 rounded-md px-6 text-base font-bold transition-colors"
+                className="studio-button-secondary inline-flex h-11 min-h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-bold transition-colors"
                 onClick={onGuideOpen}
                 type="button"
               >
-                <HelpCircle className="size-5" />
+                <HelpCircle className="size-4" />
                 프롬프트 도움
               </button>
+              </div>
             </div>
           </div>
 
@@ -739,11 +742,11 @@ function HomePage({
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-base font-extrabold">최근 작업</h3>
                 <span className="text-xs font-bold text-[var(--studio-subtle)]">
-                  {recentHistory.length}/2
+                  {recentHistory.length}/5
                 </span>
               </div>
               {recentHistory.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
                   {recentHistory.map((item) => (
                     <Image
                       alt="최근 완성 이미지"
