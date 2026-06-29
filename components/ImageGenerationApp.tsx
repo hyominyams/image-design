@@ -14,10 +14,10 @@ import {
   Loader2,
   Lock,
   Palette,
+  RotateCcw,
   Settings,
   RefreshCw,
   Sparkles,
-  Trash2,
   Upload,
   User,
   X,
@@ -1047,11 +1047,12 @@ function StepOnePage({
                   </button>
                   <button
                     className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md border border-[rgb(180_92_106_/_0.28)] bg-[rgb(180_92_106_/_0.08)] px-2 text-sm font-bold text-[var(--destructive)] transition-colors hover:bg-[rgb(180_92_106_/_0.13)] sm:px-3"
+                    aria-label="업로드 이미지 초기화"
                     onClick={onClearImage}
                     type="button"
                   >
-                    <Trash2 className="size-4" />
-                    삭제
+                    <RotateCcw className="size-4" />
+                    초기화
                   </button>
                 </div>
               </div>
