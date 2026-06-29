@@ -1,6 +1,6 @@
 export const generationConfig = {
   maxCount: 5,
-  maxHistoryCount: 2,
+  maxHistoryCount: 5,
   maxFileSizeBytes: 5 * 1024 * 1024,
   maxReferenceFileSizeBytes: 512 * 1024,
   maxInputImageCount: 16,

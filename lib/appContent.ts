@@ -6,13 +6,13 @@ export const appCopy = {
   },
   hero: {
     eyebrow: "AI 이미지 스튜디오",
-    title: "프롬프트로 이미지 만들기",
+    title: "스튜디오에서 이미지 만들기",
     description:
-      "원하는 장면을 적고 필요한 이미지를 더하면 사진, 포스터, 일러스트 같은 결과를 만들 수 있습니다.",
+      "프롬프트, 참고 이미지, 레퍼런스 디자인으로 원하는 이미지를 만드세요.",
     guideCta: "프롬프트 도움",
   },
   nav: [
-    { id: "upload", label: "업로드" },
+    { id: "upload", label: "작업 이미지" },
     { id: "description", label: "프롬프트" },
     { id: "styles", label: "레퍼런스" },
     { id: "result", label: "결과" },
@@ -32,14 +32,14 @@ export const appCopy = {
     toggleToDark: "다크 모드로 전환",
   },
   upload: {
-    title: "1. 이미지 업로드",
-    description: "필요한 경우 참고 이미지를 올려요.",
+    title: "작업 이미지",
+    description: "참고할 이미지가 있으면 추가하세요.",
     button: "이미지 고르기",
     helper: "이미지 파일은 5MB 이하로 올려 주세요.",
-    empty: "참고 이미지가 있으면 올려요",
+    empty: "참고 이미지 추가",
   },
   description: {
-    title: "2. 프롬프트 작성",
+    title: "프롬프트",
     placeholder: "만들고 싶은 이미지의 대상, 분위기, 색감, 구도, 용도를 적어 주세요.",
     example:
       "예시: 햇빛이 들어오는 작은 작업실 책상 위에 세라믹 머그컵과 스케치북이 놓인 사진. 따뜻한 자연광, 차분한 색감, 잡지 화보 같은 구도.",
@@ -59,8 +59,8 @@ export const appCopy = {
     ],
   },
   styles: {
-    title: "3. 레퍼런스 디자인 선택",
-    description: "결과에 어울리는 시각 방향을 선택해요.",
+    title: "레퍼런스",
+    description: "결과에 어울리는 시각 방향을 선택하세요.",
   },
   counter: {
     title: "남은 생성 횟수",
@@ -76,13 +76,13 @@ export const appCopy = {
     resetResult: "결과 지우기",
   },
   result: {
-    title: "4. 완성 이미지",
+    title: "결과",
     empty: "생성된 이미지가 이곳에 나타나요.",
     success: "이미지가 완성되었습니다.",
   },
   history: {
     title: "완성 이미지 보관함",
-    description: "이 기기에서 최근 2개까지 다시 볼 수 있어요.",
+    description: "이 기기에서 최근 5개까지 다시 볼 수 있어요.",
     empty: "아직 저장된 완성 이미지가 없어요.",
   },
   errors: {

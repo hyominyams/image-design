@@ -9,9 +9,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-[0_4px_0_var(--accent)] hover:bg-primary/90",
+          "bg-primary text-primary-foreground shadow-[0_12px_28px_rgba(36,43,45,0.16)] hover:bg-primary/90",
         secondary:
-          "bg-secondary text-background shadow-[0_4px_0_var(--accent)] hover:bg-secondary/90",
+          "bg-secondary text-background shadow-[0_12px_28px_rgba(36,43,45,0.14)] hover:bg-secondary/90",
         outline:
           "border border-border bg-card text-foreground hover:bg-popover",
         ghost: "text-foreground hover:bg-popover",
@@ -65,4 +65,3 @@ export function Button({
     />
   );
 }
-

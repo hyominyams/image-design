@@ -21,7 +21,7 @@ export default function RootLayout({
         className="min-h-full flex flex-col"
         style={{
           fontFamily:
-            '"Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif',
+            '"Pretendard Variable", Pretendard, SUIT, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif',
         }}
       >
         {children}

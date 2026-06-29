@@ -6,14 +6,21 @@ import {
   ArrowRight,
   CheckCircle2,
   Download,
+  FileImage,
+  GalleryHorizontal,
   HelpCircle,
+  Home,
   ImagePlus,
   KeyRound,
   Loader2,
   Lock,
   Palette,
+  Settings,
+  RefreshCw,
   Sparkles,
+  Trash2,
   Upload,
+  User,
   X,
 } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -44,29 +51,62 @@ type UploadedImage = {
   name: string;
 };
 
-type AppPage = "home" | "step-1" | "step-2" | "step-3";
+type AppPage = "home" | "step-1" | "step-2" | "step-3" | "step-4";
 
-const pageOrder: AppPage[] = ["home", "step-1", "step-2", "step-3"];
+const pageOrder: AppPage[] = ["home", "step-1", "step-2", "step-3", "step-4"];
 const steps = [
   {
     page: "step-1" as const,
-    label: "이미지와 프롬프트",
-    emoji: "🖼️",
-    description: "참고 이미지는 선택하고, 만들 이미지는 프롬프트로 정해요.",
+    label: "Upload & Prompt",
+    icon: ImagePlus,
+    description: "이미지와 프롬프트를 준비하세요.",
   },
   {
     page: "step-2" as const,
-    label: "레퍼런스 선택",
-    emoji: "🎨",
-    description: "없음 또는 원하는 시각 방향을 골라요.",
+    label: "AI Reference",
+    icon: Palette,
+    description: "원하는 시각 방향을 선택하세요.",
   },
   {
     page: "step-3" as const,
-    label: "생성하고 저장",
-    emoji: "✨",
-    description: "완성 이미지를 확인하고 보관함에 저장해요.",
+    label: "Generating",
+    icon: Sparkles,
+    description: "결과를 생성하고 확인하세요.",
+  },
+  {
+    page: "step-4" as const,
+    label: "Gallery",
+    icon: GalleryHorizontal,
+    description: "완성 이미지를 보관하세요.",
   },
 ];
+
+const studioAssets = {
+  hero: "/studio/studio-showroom-hero.png",
+  materialBoard: "/studio/studio-material-board.png",
+  emptyPreview: "/studio/studio-empty-preview.png",
+  livingPreview: "/studio/showroom-living-preview.png",
+} as const;
+
+function getActiveNavId(currentPage: AppPage) {
+  if (currentPage === "step-1") {
+    return "upload";
+  }
+
+  if (currentPage === "step-2") {
+    return "styles";
+  }
+
+  if (currentPage === "step-3") {
+    return "result";
+  }
+
+  if (currentPage === "step-4") {
+    return "gallery";
+  }
+
+  return "";
+}
 
 function createDownloadFileName() {
   const timestamp = new Date()
@@ -145,7 +185,7 @@ export function ImageGenerationApp() {
       setHasCheckedAccess(true);
       syncPageFromHash();
       setGenerationCountState(getGenerationCount());
-      setHistory(getGeneratedImageHistory());
+      void getGeneratedImageHistory().then(setHistory);
     });
 
     window.addEventListener("hashchange", syncPageFromHash);
@@ -293,7 +333,7 @@ export function ImageGenerationApp() {
 
       setGenerationCount(nextCount);
       setGenerationCountState(nextCount);
-      setHistory(addGeneratedImageHistory(historyItem));
+      setHistory(await addGeneratedImageHistory(historyItem));
       setGeneratedImageUrl(imageUrl);
       setStatusMessage("완성 이미지가 보관함에 저장되었어요.");
     } catch (error) {
@@ -307,7 +347,7 @@ export function ImageGenerationApp() {
   }
 
   if (!hasCheckedAccess) {
-    return <main className="min-h-screen bg-[#fff7ea]" />;
+    return <main className="studio-shell min-h-screen" />;
   }
 
   if (!hasAccess) {
@@ -315,71 +355,88 @@ export function ImageGenerationApp() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fff7ea] text-[#29323a]">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
-        <AppHeader
-          currentPage={page}
-          onGuideOpen={() => setIsGuideOpen(true)}
-          onHome={() => goToPage("home")}
-          remainingCount={remainingCount}
-        />
-
-        {page === "home" && (
-          <HomePage
-            onGuideOpen={() => setIsGuideOpen(true)}
-            onStart={() => goToPage("step-1")}
-          />
-        )}
-
-        {page !== "home" && (
-          <StepShell
-            canOpenGenerateStep={canOpenGenerateStep}
-            canOpenStyleStep={canOpenStyleStep}
+    <main className="studio-shell min-h-screen p-3 sm:p-4">
+      <div className="mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-[1540px] overflow-hidden rounded-xl border border-[var(--studio-line)] bg-[#fffdfa]/82 shadow-[var(--studio-shadow-md)] lg:grid-cols-[132px_minmax(0,1fr)]">
+        <StudioSidebar currentPage={page} onNavigate={goToPage} />
+        <section className="min-w-0 border-t border-[var(--studio-line)] bg-[#fffdfa]/72 lg:border-l lg:border-t-0">
+          <AppHeader
             currentPage={page}
-            onStepClick={goToPage}
-          >
-            {page === "step-1" && (
-              <StepOnePage
-                errorMessage={errorMessage}
-                fileInputRef={fileInputRef}
-                onFileChange={handleFileChange}
-                onGuideOpen={() => setIsGuideOpen(true)}
-                onNext={goToStyleStep}
-                setStudentDescription={setStudentDescription}
-                studentDescription={studentDescription}
-                uploadedImage={uploadedImage}
-              />
-            )}
+            onGuideOpen={() => setIsGuideOpen(true)}
+            remainingCount={remainingCount}
+          />
 
-            {page === "step-2" && (
-              <StepTwoPage
-                onBack={() => goToPage("step-1")}
-                onNext={goToGenerateStep}
-                onSelect={setSelectedStyleId}
-                selectedStyle={selectedStyle}
-                selectedStyleId={selectedStyleId}
-              />
-            )}
-
-            {page === "step-3" && (
-              <StepThreePage
-                errorMessage={errorMessage}
-                generatedImageUrl={generatedImageUrl}
-                hasReachedLimit={hasReachedLimit}
+          <div className="min-w-0 p-4 sm:p-6 lg:p-8">
+            {page === "home" && (
+              <HomePage
                 history={history}
-                isGenerating={isGenerating}
-                onBack={() => goToPage("step-2")}
-                onGenerate={handleGenerate}
-                onSelectSaved={setGeneratedImageUrl}
-                remainingCount={remainingCount}
+                onGuideOpen={() => setIsGuideOpen(true)}
+                onStart={() => goToPage("step-1")}
                 selectedStyle={selectedStyle}
-                statusMessage={statusMessage}
-                studentDescription={studentDescription}
-                uploadedImage={uploadedImage}
               />
             )}
-          </StepShell>
-        )}
+
+            {page !== "home" && (
+              <StepShell
+                canOpenGenerateStep={canOpenGenerateStep}
+                canOpenStyleStep={canOpenStyleStep}
+                currentPage={page}
+                onStepClick={goToPage}
+              >
+                {page === "step-1" && (
+                  <StepOnePage
+                    errorMessage={errorMessage}
+                    fileInputRef={fileInputRef}
+                    onClearImage={() => {
+                      setUploadedImage(null);
+                      setErrorMessage("");
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = "";
+                      }
+                    }}
+                    onFileChange={handleFileChange}
+                    onGuideOpen={() => setIsGuideOpen(true)}
+                    onNext={goToStyleStep}
+                    setStudentDescription={setStudentDescription}
+                    studentDescription={studentDescription}
+                    uploadedImage={uploadedImage}
+                  />
+                )}
+
+                {page === "step-2" && (
+                  <StepTwoPage
+                    onBack={() => goToPage("step-1")}
+                    onNext={goToGenerateStep}
+                    onSelect={setSelectedStyleId}
+                    selectedStyle={selectedStyle}
+                    selectedStyleId={selectedStyleId}
+                  />
+                )}
+
+                {page === "step-3" && (
+                  <StepThreePage
+                    errorMessage={errorMessage}
+                    generatedImageUrl={generatedImageUrl}
+                    hasReachedLimit={hasReachedLimit}
+                    isGenerating={isGenerating}
+                    onBack={() => goToPage("step-2")}
+                    onGenerate={handleGenerate}
+                    remainingCount={remainingCount}
+                    selectedStyle={selectedStyle}
+                    statusMessage={statusMessage}
+                  />
+                )}
+
+                {page === "step-4" && (
+                  <StepFourPage
+                    generatedImageUrl={generatedImageUrl}
+                    history={history}
+                    onSelectSaved={setGeneratedImageUrl}
+                  />
+                )}
+              </StepShell>
+            )}
+          </div>
+        </section>
       </div>
 
       {isGuideOpen && <GuideModal onClose={() => setIsGuideOpen(false)} />}
@@ -403,22 +460,29 @@ function AccessCodePage({ onUnlock }: { onUnlock: (code: string) => boolean }) {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#fff7ea] px-4 py-8 text-[#29323a]">
-      <section className="w-full max-w-md rounded-lg border border-[#efd6ad] bg-white p-5 shadow-[0_4px_0_#f0d7ab]">
-        <div className="flex size-12 items-center justify-center rounded-md bg-[#fff0d8] text-[#d16f91]">
+    <main className="studio-shell relative isolate flex min-h-screen items-center justify-center overflow-hidden px-4 py-8">
+      <Image
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 -z-20 h-full w-full object-cover opacity-30"
+        height={920}
+        priority
+        src={studioAssets.hero}
+        width={1280}
+      />
+      <div className="absolute inset-0 -z-10 bg-[#f6f0e7]/78" />
+      <section className="studio-surface w-full max-w-sm rounded-xl p-5">
+        <div className="flex size-11 items-center justify-center rounded-md bg-[var(--studio-panel-soft)] text-[var(--studio-clay)]">
           <KeyRound className="size-6" />
         </div>
         <div className="mt-5">
-          <p className="text-sm font-extrabold text-[#d16f91]">AI 이미지 스튜디오</p>
-          <h1 className="mt-1 text-3xl font-extrabold leading-tight">접속 코드 입력</h1>
-          <p className="mt-2 text-sm font-semibold leading-6 text-[#7c5566]">
-            6자리 코드를 입력하면 이미지 생성 화면으로 이동합니다.
-          </p>
+          <p className="text-sm font-bold text-[var(--studio-clay)]">AI 이미지 스튜디오</p>
+          <h1 className="mt-1 text-3xl font-extrabold leading-tight">접속 코드</h1>
         </div>
         <label className="mt-5 block">
-          <span className="text-sm font-extrabold text-[#7c5566]">접속 코드</span>
+          <span className="text-sm font-bold text-[var(--studio-subtle)]">접속 코드</span>
           <input
-            className="mt-2 h-14 w-full rounded-md border border-[#efd6ad] bg-white px-4 text-center text-2xl font-extrabold tracking-[0.28em] outline-none focus:border-[#6ebfc4] focus:ring-2 focus:ring-[#6ebfc4]/40"
+            className="studio-focus mt-2 h-14 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] px-4 text-center text-2xl font-extrabold tracking-[0.28em]"
             inputMode="numeric"
             maxLength={6}
             onChange={(event) => {
@@ -436,111 +500,211 @@ function AccessCodePage({ onUnlock }: { onUnlock: (code: string) => boolean }) {
         </label>
         {errorMessage && <AlertMessage>{errorMessage}</AlertMessage>}
         <PrimaryButton className="mt-5 sm:w-full" onClick={submitCode}>
-          입장하기 <ArrowRight className="size-5" />
+          입장 <ArrowRight className="size-5" />
         </PrimaryButton>
       </section>
     </main>
   );
 }
 
+function StudioSidebar({
+  currentPage,
+  onNavigate,
+}: {
+  currentPage: AppPage;
+  onNavigate: (page: AppPage) => void;
+}) {
+  const isCreateActive = currentPage !== "step-4";
+  const isGalleryActive = currentPage === "step-4";
+
+  return (
+    <aside className="flex min-h-20 flex-row items-center gap-2 overflow-x-auto bg-[#fffdfa]/84 px-3 py-3 lg:min-h-0 lg:flex-col lg:items-stretch lg:overflow-visible lg:px-3 lg:py-5">
+      <button
+        className="flex shrink-0 items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-semibold text-[var(--studio-subtle)]"
+        onClick={() => onNavigate("home")}
+        type="button"
+      >
+        <Home className="size-4 text-[var(--studio-clay)]" />
+        <span className="whitespace-nowrap text-xs font-bold">Showroom AI</span>
+      </button>
+
+      <nav className="flex gap-2 lg:mt-8 lg:flex-col" aria-label="사이드바">
+        <button
+          className={cn(
+            "flex h-11 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-bold transition-colors",
+            isCreateActive
+              ? "bg-[#f3eadf] text-[var(--studio-clay)]"
+              : "text-[var(--studio-subtle)] hover:bg-[#f3eadf]/72",
+          )}
+          onClick={() => onNavigate("step-1")}
+          type="button"
+        >
+          <ImagePlus className="size-4" />
+          Create
+        </button>
+        <button
+          className={cn(
+            "flex h-11 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-bold transition-colors",
+            isGalleryActive
+              ? "bg-[#f3eadf] text-[var(--studio-clay)]"
+              : "text-[var(--studio-subtle)] hover:bg-[#f3eadf]/72",
+          )}
+          onClick={() => onNavigate("step-4")}
+          type="button"
+        >
+          <GalleryHorizontal className="size-4" />
+          Gallery
+        </button>
+        <button
+          className="flex h-11 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-bold text-[var(--studio-subtle)] transition-colors hover:bg-[#f3eadf]/72"
+          onClick={() => onNavigate("home")}
+          type="button"
+        >
+          <User className="size-4" />
+          Profile
+        </button>
+      </nav>
+
+      <button
+        className="mt-0 flex h-11 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-bold text-[var(--studio-subtle)] transition-colors hover:bg-[#f3eadf]/72 lg:mt-auto"
+        onClick={() => onNavigate("home")}
+        type="button"
+      >
+        <Settings className="size-4" />
+        Settings
+      </button>
+    </aside>
+  );
+}
+
 function AppHeader({
   currentPage,
   onGuideOpen,
-  onHome,
   remainingCount,
 }: {
   currentPage: AppPage;
   onGuideOpen: () => void;
-  onHome: () => void;
   remainingCount: number;
 }) {
-  return (
-    <header className="flex flex-col gap-3 rounded-lg border border-[#efd6ad] bg-white p-4 shadow-[0_4px_0_#f0d7ab] sm:flex-row sm:items-center sm:justify-between">
-      <button className="text-left" onClick={onHome} type="button">
-        <p className="text-xs font-extrabold text-[#d16f91]">AI 이미지 스튜디오</p>
-        <h1 className="text-balance text-xl font-extrabold leading-tight sm:text-2xl">
-          프롬프트로 이미지 만들기
-        </h1>
-      </button>
+  const activeNavId = getActiveNavId(currentPage);
+  const title =
+    currentPage === "step-1"
+      ? "1. Upload & Prompt"
+      : currentPage === "step-2"
+        ? "2. AI Reference"
+        : currentPage === "step-3"
+          ? "3. Generating"
+          : currentPage === "step-4"
+            ? "4. Gallery"
+            : "Showroom AI";
+  const subtitle =
+    currentPage === "step-1"
+      ? "사진을 업로드하고 원하는 공간을 설명해 주세요."
+      : currentPage === "step-2"
+        ? "원하는 스타일을 선택해 AI가 공간감을 반영합니다."
+        : currentPage === "step-3"
+          ? "AI가 이미지를 생성하는 동안 결과를 확인하세요."
+          : currentPage === "step-4"
+            ? "생성된 이미지를 보관하고 다시 확인하세요."
+            : "프롬프트와 레퍼런스로 이미지를 만드세요.";
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-md border border-[#efd6ad] bg-[#fff0d8] px-3 py-2 text-sm font-extrabold text-[#7c5566]">
-          남은 생성 횟수 {remainingCount}/5
-        </span>
-        <button
-          className="inline-flex h-11 items-center gap-2 rounded-md bg-[#d97896] px-4 text-sm font-extrabold text-white shadow-[0_4px_0_#6ebfc4]"
-          onClick={onGuideOpen}
-          type="button"
-        >
-          <HelpCircle className="size-4" />
-          프롬프트 도움
-        </button>
-        {currentPage !== "home" && (
+  return (
+    <header className="flex flex-col gap-4 border-b border-[var(--studio-line)] bg-[#fffdfa]/72 px-4 py-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between lg:px-8 lg:py-6">
+      <div>
+        <h1 className="text-balance text-2xl font-normal leading-tight text-[var(--studio-ink)] sm:text-3xl">
+          {title}
+        </h1>
+        <p className="mt-2 text-sm font-semibold leading-6 text-[var(--studio-subtle)]">
+          {subtitle}
+        </p>
+      </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="studio-chip rounded-md px-3 py-2 text-sm font-bold">
+            남은 횟수 {remainingCount}/5
+          </span>
           <button
-            className="h-11 rounded-md border border-[#efd6ad] bg-white px-4 text-sm font-extrabold text-[#7c5566]"
-            onClick={onHome}
+            className="studio-button-secondary inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm font-bold transition-colors"
+            onClick={onGuideOpen}
             type="button"
           >
-            처음으로
+            <HelpCircle className="size-4" />
+            프롬프트 도움
           </button>
-        )}
-      </div>
+          <span className="flex size-10 items-center justify-center rounded-full border border-[var(--studio-line)] bg-[#fffdfa] text-sm font-extrabold text-[var(--studio-ink)]">
+            S
+          </span>
+        </div>
+      {activeNavId && (
+        <div className="sr-only" aria-live="polite">
+          {activeNavId}
+        </div>
+      )}
     </header>
   );
 }
 
 function HomePage({
+  history,
   onGuideOpen,
   onStart,
+  selectedStyle,
 }: {
+  history: GeneratedImageHistoryItem[];
   onGuideOpen: () => void;
   onStart: () => void;
+  selectedStyle?: StylePreset;
 }) {
+  const recentHistory = history.slice(0, 2);
+
   return (
     <section className="space-y-5">
-      <div className="relative isolate overflow-hidden rounded-xl border-2 border-[#e7cfae] bg-white shadow-[0_8px_0_#f0d7ab]">
+      <div className="studio-frame relative isolate overflow-hidden rounded-xl">
         <Image
           alt=""
           aria-hidden="true"
           className="absolute inset-0 -z-20 h-full w-full object-cover opacity-[0.18]"
           height={920}
           priority
-          src="/styles/poster.png"
+          src={studioAssets.hero}
           width={1280}
         />
-        <div className="absolute inset-0 -z-10 bg-white/78" />
+        <div className="absolute inset-0 -z-10 bg-[#fffdfa]/86" />
 
-        <div className="grid min-h-[520px] gap-6 p-5 sm:p-7 lg:grid-cols-[1fr_360px] lg:p-9">
-          <div className="flex max-w-3xl flex-col justify-center gap-6">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-[#efd6ad] bg-[#fff0d8] px-3 py-1 text-sm font-extrabold text-[#d16f91]">
-                이미지 생성
-              </span>
-              <span className="rounded-full border border-[#c7e8e9] bg-[#e8fbfb] px-3 py-1 text-sm font-extrabold text-[#277077]">
-                프롬프트 + 선택 이미지
-              </span>
-            </div>
+        <div className="grid min-h-[620px] gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_430px] lg:p-7">
+          <div className="flex min-w-0 flex-col justify-between rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/72 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] sm:p-7">
+            <div>
+              <div className="mb-10 flex flex-wrap items-center gap-2">
+                {appCopy.nav.slice(0, 4).map((item) => (
+                  <span
+                    className="rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/74 px-3 py-1.5 text-sm font-bold text-[var(--studio-subtle)]"
+                    key={item.id}
+                  >
+                    {item.label}
+                  </span>
+                ))}
+              </div>
 
-            <div className="space-y-4">
-              <h2 className="text-balance max-w-2xl text-[38px] font-extrabold leading-[1.12] tracking-normal text-[#202b33] sm:text-[54px] lg:text-[62px]">
-                원하는 장면을 이미지로
+              <p className="text-sm font-extrabold uppercase tracking-[0.2em] text-[var(--studio-clay)]">
+                {appCopy.hero.eyebrow}
+              </p>
+              <h2 className="mt-4 max-w-4xl text-balance text-[38px] font-extrabold leading-[1.04] tracking-normal text-[var(--studio-ink)] sm:text-[62px] lg:text-[76px]">
+                밝은 쇼룸에서 이미지를 만드세요
               </h2>
-              <p className="text-pretty max-w-xl text-lg font-semibold leading-8 text-[#6f5a63]">
-                프롬프트를 쓰고 필요한 경우 참고 이미지를 더하세요. 레퍼런스 디자인은
-                사진, 포스터, 일러스트, 3D 렌더 같은 시각 방향을 잡아줍니다.
+              <p className="mt-6 max-w-2xl text-pretty text-base font-semibold leading-7 text-[var(--studio-subtle)] sm:text-lg sm:leading-8">
+                프롬프트와 레퍼런스를 놓고, 결과를 확인하고, 완성 이미지를 보관하세요.
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
-                className="inline-flex h-14 items-center justify-center gap-2 rounded-lg bg-[#f4bf5f] px-7 text-base font-extrabold text-[#2b2b22] shadow-[0_5px_0_#d97896] transition-transform hover:-translate-y-0.5"
+                className="studio-button-primary inline-flex h-[52px] min-h-[52px] items-center justify-center gap-2 rounded-md px-6 text-base font-extrabold transition-transform hover:-translate-y-0.5"
                 onClick={onStart}
                 type="button"
               >
-                이미지 만들기 <ArrowRight className="size-5" />
+                작업 시작 <ArrowRight className="size-5" />
               </button>
               <button
-                className="inline-flex h-14 items-center justify-center gap-2 rounded-lg border-2 border-[#e7cfae] bg-white/92 px-7 text-base font-extrabold text-[#7c5566] transition-colors hover:bg-[#fff0d8]"
+                className="studio-button-secondary inline-flex h-[52px] min-h-[52px] items-center justify-center gap-2 rounded-md px-6 text-base font-bold transition-colors"
                 onClick={onGuideOpen}
                 type="button"
               >
@@ -550,53 +714,95 @@ function HomePage({
             </div>
           </div>
 
-          <div className="grid content-center gap-3">
-            <div className="rounded-xl border-2 border-[#e7cfae] bg-white/90 p-3 shadow-[0_5px_0_#f0d7ab]">
+          <aside className="grid min-w-0 grid-rows-[auto_auto_1fr] gap-3">
+            <div className="overflow-hidden rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/82 p-3 shadow-[var(--studio-shadow-xs)]">
               <Image
-                alt="AI 이미지 생성 예시"
-                className="aspect-[4/3] w-full rounded-lg object-cover"
+                alt="스튜디오 재료 보드"
+                className="aspect-[4/3] w-full rounded-md object-cover"
                 height={520}
                 priority
-                src="/styles/watercolor.png"
+                src={studioAssets.materialBoard}
                 width={520}
               />
+              <div className="mt-3 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-[var(--studio-clay)]">현재 레퍼런스</p>
+                  <p className="mt-1 text-pretty text-lg font-extrabold">
+                    {selectedStyle?.name ?? "레퍼런스 선택"}
+                  </p>
+                </div>
+                <Palette className="mt-1 size-5 shrink-0 text-[var(--studio-sage)]" />
+              </div>
             </div>
+
+            <div className="rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/82 p-4 shadow-[var(--studio-shadow-xs)]">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-base font-extrabold">최근 작업</h3>
+                <span className="text-xs font-bold text-[var(--studio-subtle)]">
+                  {recentHistory.length}/2
+                </span>
+              </div>
+              {recentHistory.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {recentHistory.map((item) => (
+                    <Image
+                      alt="최근 완성 이미지"
+                      className="aspect-square rounded-md border border-[var(--studio-line)] object-cover"
+                      height={180}
+                      key={item.id}
+                      src={item.imageUrl}
+                      unoptimized
+                      width={180}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="studio-paper flex min-h-32 items-center justify-center rounded-md p-4 text-center">
+                  <p className="text-sm font-bold leading-6 text-[var(--studio-subtle)]">
+                    완성 이미지가 여기에 저장됩니다
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg border border-[#efd6ad] bg-white/92 p-4">
-                <p className="text-sm font-extrabold text-[#d16f91]">입력</p>
-                <p className="mt-1 text-pretty text-base font-extrabold">
-                  프롬프트 필수
-                </p>
+              <div className="rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/72 p-4">
+                <p className="text-sm font-bold text-[var(--studio-clay)]">레퍼런스</p>
+                <p className="mt-1 text-lg font-extrabold">52개</p>
               </div>
-              <div className="rounded-lg border border-[#c7e8e9] bg-[#e8fbfb]/92 p-4">
-                <p className="text-sm font-extrabold text-[#277077]">참고</p>
-                <p className="mt-1 text-pretty text-base font-extrabold">
-                  이미지는 선택
-                </p>
+              <div className="rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/72 p-4">
+                <p className="text-sm font-bold text-[var(--studio-teal)]">보관함</p>
+                <p className="mt-1 text-lg font-extrabold">최근 5개</p>
               </div>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
-        {steps.map((step, index) => (
-          <div
-            className="rounded-xl border-2 border-[#e7cfae] bg-white p-5 shadow-[0_5px_0_#f0d7ab]"
-            key={step.page}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-3xl">{step.emoji}</span>
-              <span className="rounded-full bg-[#fff0d8] px-3 py-1 text-xs font-extrabold text-[#d16f91]">
-                STEP {index + 1}
-              </span>
+      <div className="grid gap-3 rounded-xl border border-[var(--studio-line)] bg-[#fffdfa]/64 p-3 lg:grid-cols-3">
+        {steps.map((step, index) => {
+          const Icon = step.icon;
+
+          return (
+            <div
+              className="rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/74 p-4"
+              key={step.page}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex size-9 items-center justify-center rounded-md bg-[var(--studio-paper)] text-[var(--studio-sage)]">
+                  <Icon className="size-5" />
+                </span>
+                <span className="rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/78 px-3 py-1 text-xs font-bold text-[var(--studio-clay)]">
+                  STEP {index + 1}
+                </span>
+              </div>
+              <h3 className="mt-4 text-balance text-lg font-extrabold">{step.label}</h3>
+              <p className="mt-2 text-pretty text-sm font-semibold leading-6 text-[var(--studio-subtle)]">
+                {step.description}
+              </p>
             </div>
-            <h3 className="mt-4 text-balance text-xl font-extrabold">{step.label}</h3>
-            <p className="mt-2 text-pretty text-sm font-semibold leading-6 text-[#7c5566]">
-              {step.description}
-            </p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -616,6 +822,14 @@ function StepShell({
   onStepClick: (page: AppPage) => void;
 }) {
   const isStepAvailable = (stepPage: AppPage) => {
+    if (stepPage === currentPage) {
+      return true;
+    }
+
+    if (stepPage === "step-4") {
+      return true;
+    }
+
     if (stepPage === "step-1") {
       return true;
     }
@@ -633,33 +847,38 @@ function StepShell({
 
   return (
     <section className="space-y-4">
-      <div className="grid gap-2 rounded-lg border border-[#efd6ad] bg-white p-2 shadow-[0_4px_0_#f0d7ab] sm:grid-cols-3">
-        {steps.map((step, index) => (
-          <button
-            className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-3 text-left transition-colors",
-              currentPage === step.page
-                ? "bg-[#f4bf5f] text-[#2b2b22]"
-                : "bg-[#fff0d8] text-[#7c5566] hover:bg-[#f7e7d4]",
-              !isStepAvailable(step.page) && "cursor-not-allowed opacity-45 hover:bg-[#fff0d8]",
-            )}
-            key={step.page}
-            onClick={() => isStepAvailable(step.page) && onStepClick(step.page)}
-            disabled={!isStepAvailable(step.page)}
-            type="button"
-          >
-            <span className="text-2xl">
-              {isStepAvailable(step.page) ? step.emoji : <Lock className="size-6" />}
-            </span>
-            <span>
-              <span className="block text-xs font-extrabold">STEP {index + 1}</span>
-              <span className="block text-sm font-extrabold">{step.label}</span>
-              {!isStepAvailable(step.page) && (
-                <span className="mt-0.5 block text-[11px] font-extrabold">먼저 이전 단계</span>
+      <div className="studio-toolbar grid gap-2 rounded-xl p-2 sm:grid-cols-2 xl:grid-cols-4">
+        {steps.map((step, index) => {
+          const Icon = step.icon;
+          const available = isStepAvailable(step.page);
+
+          return (
+            <button
+              className={cn(
+                "flex min-h-14 items-center gap-3 rounded-md px-3 py-2 text-left transition-colors",
+                currentPage === step.page
+                  ? "bg-[var(--studio-ink)] text-[#fffaf3]"
+                  : "bg-transparent text-[var(--studio-subtle)] hover:bg-[#fffdfa]/72",
+                !available && "cursor-not-allowed opacity-45 hover:bg-[var(--studio-panel-soft)]",
               )}
-            </span>
-          </button>
-        ))}
+              key={step.page}
+              onClick={() => available && onStepClick(step.page)}
+              disabled={!available}
+              type="button"
+            >
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/64">
+                {available ? <Icon className="size-5" /> : <Lock className="size-5" />}
+              </span>
+              <span>
+                <span className="block text-xs font-extrabold">STEP {index + 1}</span>
+                <span className="block text-sm font-extrabold">{step.label}</span>
+                {!available && (
+                  <span className="mt-0.5 block text-[11px] font-extrabold">이전 단계 필요</span>
+                )}
+              </span>
+            </button>
+          );
+        })}
       </div>
       {children}
     </section>
@@ -669,6 +888,7 @@ function StepShell({
 function StepOnePage({
   errorMessage,
   fileInputRef,
+  onClearImage,
   onFileChange,
   onGuideOpen,
   onNext,
@@ -678,6 +898,7 @@ function StepOnePage({
 }: {
   errorMessage: string;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
+  onClearImage: () => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onGuideOpen: () => void;
   onNext: () => void;
@@ -686,8 +907,8 @@ function StepOnePage({
   uploadedImage: UploadedImage | null;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-[420px_1fr]">
-      <Panel title="이미지 업로드" subtitle="참고 이미지는 선택 사항입니다.">
+    <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+      <Panel title={appCopy.upload.title} subtitle={appCopy.upload.description}>
         <input
           accept={uploadConfig.acceptAttribute}
           className="hidden"
@@ -695,63 +916,127 @@ function StepOnePage({
           ref={fileInputRef}
           type="file"
         />
-        <button
-          className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg border border-dashed border-[#d8b985] bg-[#fff0d8]"
-          onClick={() => fileInputRef.current?.click()}
-          type="button"
-        >
-          {uploadedImage ? (
-            <Image
-              alt="업로드 이미지 미리보기"
-              className="h-full w-full object-contain p-3"
-              height={600}
-              src={uploadedImage.dataUrl}
-              unoptimized
-              width={800}
-            />
-          ) : (
-              <span className="flex flex-col items-center gap-3 text-center text-[#9b6176]">
-                <Upload className="size-12" />
-              <span className="text-xl font-extrabold">참고 이미지 추가</span>
-              <span className="text-sm font-semibold">jpg, png, webp / 최대 5MB</span>
-            </span>
-          )}
-        </button>
-        <button
-          className="mt-4 inline-flex h-12 items-center gap-2 rounded-md border border-[#efd6ad] bg-white px-4 text-sm font-extrabold text-[#7c5566]"
-          onClick={() => fileInputRef.current?.click()}
-          type="button"
-        >
-          <ImagePlus className="size-4" />
-          이미지 고르기
-        </button>
+        <div className="min-w-0 rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)] p-3">
+          <button
+            className={cn(
+              "group relative flex aspect-[16/11] min-w-0 w-full items-center justify-center overflow-hidden rounded-md border text-left transition-all",
+              uploadedImage
+                ? "border-[rgb(99_116_105_/_0.34)] bg-[#fffdfa] shadow-[0_10px_24px_rgba(34,40,42,0.07)]"
+                : "border-dashed border-[var(--studio-line)] bg-[#fffdfa]/56 hover:border-[var(--studio-teal)]",
+            )}
+            onClick={() => fileInputRef.current?.click()}
+            type="button"
+          >
+            {uploadedImage ? (
+              <>
+                <Image
+                  alt="업로드 이미지 미리보기"
+                  className="h-full w-full object-contain p-4"
+                  height={720}
+                  src={uploadedImage.dataUrl}
+                  unoptimized
+                  width={1040}
+                />
+                <span className="absolute left-3 top-3 rounded-md border border-[rgb(255_253_250_/_0.72)] bg-[#fffdfa]/88 px-3 py-1 text-xs font-bold text-[var(--studio-sage)] shadow-[var(--studio-shadow-xs)] backdrop-blur-sm">
+                  참고 이미지
+                </span>
+                <span className="absolute right-3 top-3 flex items-center gap-1 rounded-md bg-[var(--studio-ink)] px-3 py-1 text-xs font-bold text-[#fffaf3] shadow-[var(--studio-shadow-xs)]">
+                  <CheckCircle2 className="size-3.5" />
+                  사용 중
+                </span>
+                <span className="pointer-events-none absolute inset-3 rounded-md border border-[#fffdfa]/64" />
+              </>
+            ) : (
+                <span className="flex w-full max-w-sm flex-col items-start gap-4 p-5 text-[var(--studio-subtle)]">
+                <span className="flex size-11 items-center justify-center rounded-md bg-[var(--studio-panel)] text-[var(--studio-sage)] shadow-[var(--studio-shadow-xs)]">
+                  <Upload className="size-6" />
+                </span>
+                <span>
+                  <span className="block text-lg font-extrabold text-[var(--studio-ink)]">
+                    {appCopy.upload.empty}
+                  </span>
+                  <span className="mt-2 block text-sm font-semibold leading-6">
+                    jpg, png, webp / 최대 5MB
+                  </span>
+                </span>
+              </span>
+            )}
+          </button>
+
+          <div className="mt-3 grid min-w-0 gap-2">
+            {uploadedImage ? (
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3 overflow-hidden rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/82 px-3 py-2">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--studio-panel-soft)] text-[var(--studio-sage)]">
+                    <FileImage className="size-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-extrabold text-[var(--studio-ink)]">
+                      {uploadedImage.name}
+                    </p>
+                    <p className="text-xs font-semibold text-[var(--studio-subtle)]">
+                      참고 이미지
+                    </p>
+                  </div>
+                </div>
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 sm:flex">
+                  <button
+                    className="studio-button-secondary inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-bold transition-colors sm:px-3"
+                    onClick={() => fileInputRef.current?.click()}
+                    type="button"
+                  >
+                    <RefreshCw className="size-4" />
+                    이미지 바꾸기
+                  </button>
+                  <button
+                    className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md border border-[rgb(180_92_106_/_0.28)] bg-[rgb(180_92_106_/_0.08)] px-2 text-sm font-bold text-[var(--destructive)] transition-colors hover:bg-[rgb(180_92_106_/_0.13)] sm:px-3"
+                    onClick={onClearImage}
+                    type="button"
+                  >
+                    <Trash2 className="size-4" />
+                    삭제
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className="studio-button-secondary inline-flex h-11 w-full items-center justify-center gap-2 rounded-md px-4 text-sm font-bold transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+                type="button"
+              >
+                <ImagePlus className="size-4" />
+                이미지 고르기
+              </button>
+            )}
+          </div>
+        </div>
       </Panel>
 
-      <Panel title="프롬프트 쓰기" subtitle="원하는 이미지를 직접 적어 주세요.">
+      <Panel title={appCopy.description.title} subtitle="만들고 싶은 이미지를 적어 주세요.">
         <textarea
-          className="min-h-48 w-full rounded-lg border border-[#efd6ad] bg-white p-4 text-base font-semibold leading-7 outline-none placeholder:text-gray-500 focus:border-[#6ebfc4] focus:ring-2 focus:ring-[#6ebfc4]/40"
+          className="studio-focus min-h-56 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] p-4 text-base font-semibold leading-7 placeholder:text-[var(--studio-subtle)]"
           maxLength={500}
           onChange={(event) => setStudentDescription(event.target.value)}
           placeholder={appCopy.description.placeholder}
           value={studentDescription}
         />
-        <div className="mt-3 rounded-lg border border-[#efd6ad] bg-[#fff0d8] p-4">
-          <p className="mb-3 text-sm font-extrabold text-[#d16f91]">프롬프트 예시</p>
-          <div className="grid gap-2 text-sm font-semibold leading-6 text-[#7c5566] sm:grid-cols-3">
+        <div className="mt-3 rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/58 p-4">
+          <p className="mb-3 text-sm font-bold text-[var(--studio-clay)]">프롬프트 예시</p>
+          <div className="grid gap-2 text-sm font-semibold leading-6 text-[var(--studio-subtle)] sm:grid-cols-3">
             {appCopy.description.exampleParts.map((part) => (
-              <div className="rounded-md border border-[#efd6ad] bg-white p-3" key={part.label}>
-                <p className="font-extrabold text-[#29323a]">{part.label}</p>
+              <div className="rounded-md border border-[var(--studio-line)] bg-[var(--studio-panel)] p-3" key={part.label}>
+                <p className="font-extrabold text-[var(--studio-ink)]">{part.label}</p>
                 <p className="mt-1 text-pretty">{part.text}</p>
               </div>
             ))}
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-extrabold text-[#9b6176]">
+          <p className="text-sm font-bold text-[var(--studio-subtle)]">
             {studentDescription.length}/500
           </p>
           <button
-            className="text-sm font-extrabold text-[#d16f91] underline underline-offset-4"
+            className="text-sm font-bold text-[var(--studio-clay)] underline underline-offset-4"
             onClick={onGuideOpen}
             type="button"
           >
@@ -792,20 +1077,20 @@ function StepTwoPage({
   );
 
   return (
-    <div className="grid gap-4 pb-28 lg:grid-cols-[1fr_340px] lg:pb-32">
+    <div className="grid gap-4 pb-28 lg:grid-cols-[minmax(0,1fr)_340px] lg:pb-32">
       <Panel
         className="order-1 lg:order-1"
-        title="레퍼런스 디자인"
-        subtitle="프롬프트에 어울리는 시각 방향을 선택해요."
+        title={appCopy.styles.title}
+        subtitle={appCopy.styles.description}
       >
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex gap-2 overflow-x-auto rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/58 p-2">
           {styleCategories.map((category) => (
             <button
               className={cn(
-                "h-9 rounded-md border px-3 text-sm font-extrabold transition-colors",
+                "h-9 shrink-0 rounded-md px-3 text-sm font-bold transition-colors",
                 selectedCategory === category
-                  ? "border-[#d97896] bg-[#d97896] text-white"
-                  : "border-[#efd6ad] bg-[#fff0d8] text-[#7c5566] hover:bg-[#f7e7d4]",
+                  ? "studio-chip-active"
+                  : "border border-[var(--studio-line)] bg-[#fffdfa]/72 text-[var(--studio-subtle)] hover:bg-[#f3eadf]",
               )}
               key={category}
               onClick={() => setSelectedCategory(category)}
@@ -816,45 +1101,45 @@ function StepTwoPage({
           ))}
         </div>
 
-        <div className="mb-3 text-sm font-extrabold text-[#7c5566]">
+        <div className="mb-3 text-sm font-bold text-[var(--studio-subtle)]">
           {visibleStylePresets.length}개 레퍼런스
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {visibleStylePresets.map((style) => (
             <button
               aria-pressed={style.id === selectedStyleId}
               className={cn(
-                "relative grid h-full min-h-[260px] grid-rows-[auto_1fr] overflow-hidden rounded-lg border bg-white text-left transition-colors",
+                "studio-thumbnail relative grid h-full min-h-[218px] grid-rows-[auto_1fr] overflow-hidden rounded-md text-left transition-all",
                 style.id === selectedStyleId
-                  ? "border-[#f4bf5f] shadow-[0_0_0_3px_#f4bf5f]"
-                  : "border-[#efd6ad] hover:border-[#6ebfc4]",
+                  ? "border-[var(--studio-clay)] shadow-[0_0_0_2px_rgba(169,101,72,0.16),0_10px_22px_rgba(34,40,42,0.07)]"
+                  : "hover:border-[var(--studio-teal)] hover:shadow-[0_8px_20px_rgba(34,40,42,0.07)]",
               )}
               key={style.id}
               onClick={() => onSelect(style.id)}
               type="button"
             >
               {style.id === selectedStyleId && (
-                <span className="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-[#f4bf5f] text-[#2b2b22] shadow">
+                <span className="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-md bg-[var(--studio-ink)] text-[#fffaf3] shadow-[var(--studio-shadow-xs)]">
                   <CheckCircle2 className="size-5" />
                 </span>
               )}
               {style.thumbnail ? (
                 <Image
                   alt={`${style.name} 썸네일`}
-                  className="aspect-[3/4] w-full object-cover"
+                  className="aspect-[4/5] w-full object-cover"
                   height={320}
                   src={style.thumbnail}
                   width={240}
                 />
               ) : (
-                <div className="flex aspect-[3/4] w-full items-center justify-center bg-[#fff0d8] text-[#9b6176]">
+                <div className="flex aspect-[4/5] w-full items-center justify-center bg-[var(--studio-panel-soft)] text-[var(--studio-subtle)]">
                   <Palette className="size-12" />
                 </div>
               )}
-              <div className="flex min-h-24 flex-col p-3">
+              <div className="flex min-h-22 flex-col p-3">
                 <p className="text-pretty font-extrabold">{style.name}</p>
-                <p className="mt-1 text-pretty text-sm font-semibold leading-5 text-[#7c5566]">
+                <p className="mt-1 text-pretty text-sm font-semibold leading-5 text-[var(--studio-subtle)]">
                   {style.description}
                 </p>
               </div>
@@ -882,51 +1167,51 @@ function StepTwoPage({
             {selectedStyle.thumbnail ? (
               <Image
                 alt={`${selectedStyle.name} 미리보기`}
-                className="aspect-[3/4] w-full rounded-lg border border-[#efd6ad] object-cover"
+                className="aspect-[4/5] w-full rounded-lg border border-[var(--studio-line)] object-cover"
                 height={520}
                 src={selectedStyle.thumbnail}
                 width={390}
               />
             ) : (
-              <div className="flex aspect-[3/4] w-full items-center justify-center rounded-lg border border-[#efd6ad] bg-[#fff0d8] text-[#9b6176]">
+              <div className="flex aspect-[4/5] w-full items-center justify-center rounded-lg border border-[var(--studio-line)] bg-[var(--studio-panel-soft)] text-[var(--studio-subtle)]">
                 <Palette className="size-16" />
               </div>
             )}
             <h2 className="mt-4 text-2xl font-extrabold">{selectedStyle.name}</h2>
-            <p className="mt-2 text-pretty text-base font-semibold leading-7 text-[#7c5566]">
+            <p className="mt-2 text-pretty text-base font-semibold leading-7 text-[var(--studio-subtle)]">
               {selectedStyle.description}
             </p>
           </>
         )}
       </Panel>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#efd6ad] bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_16px_rgba(41,50,58,0.12)] backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center gap-3">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--studio-line)] bg-[#fffdfa]/94 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_28px_rgba(34,40,42,0.075)] backdrop-blur-sm">
+        <div className="mx-auto flex max-w-[1376px] items-center gap-3">
           <SecondaryButton className="hidden shrink-0 sm:inline-flex" onClick={onBack}>
             <ArrowLeft className="size-5" />
             이전
           </SecondaryButton>
 
-          <div className="flex min-w-0 flex-1 items-center gap-3 rounded-md border border-[#efd6ad] bg-[#fff0d8] p-2">
+          <div className="flex min-w-0 flex-1 items-center gap-3 rounded-md border border-[var(--studio-line)] bg-[#f3eadf]/72 p-2">
             {selectedStyle?.thumbnail ? (
               <Image
                 alt=""
                 aria-hidden="true"
-                className="size-12 shrink-0 rounded-md object-cover"
+                className="size-12 shrink-0 rounded object-cover"
                 height={48}
                 src={selectedStyle.thumbnail}
                 width={48}
               />
             ) : (
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-md bg-white text-[#9b6176]">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-md bg-[var(--studio-panel)] text-[var(--studio-subtle)]">
                 <Palette className="size-6" />
               </div>
             )}
             <div className="min-w-0">
-              <p className="truncate text-xs font-extrabold text-[#d16f91]">
+              <p className="truncate text-xs font-bold text-[var(--studio-clay)]">
                 {selectedStyle?.category}
               </p>
-              <p className="truncate text-sm font-extrabold text-[#29323a] sm:text-base">
+              <p className="truncate text-sm font-extrabold text-[var(--studio-ink)] sm:text-base">
                 {selectedStyle?.name}
               </p>
             </div>
@@ -945,11 +1230,9 @@ function StepThreePage({
   errorMessage,
   generatedImageUrl,
   hasReachedLimit,
-  history,
   isGenerating,
   onBack,
   onGenerate,
-  onSelectSaved,
   remainingCount,
   selectedStyle,
   statusMessage,
@@ -957,24 +1240,17 @@ function StepThreePage({
   errorMessage: string;
   generatedImageUrl: string;
   hasReachedLimit: boolean;
-  history: GeneratedImageHistoryItem[];
   isGenerating: boolean;
   onBack: () => void;
   onGenerate: () => void;
-  onSelectSaved: (imageUrl: string) => void;
   remainingCount: number;
   selectedStyle?: StylePreset;
   statusMessage: string;
-  studentDescription: string;
-  uploadedImage: UploadedImage | null;
 }) {
-  const savedHistory = history.filter((item) => item.imageUrl !== generatedImageUrl);
-
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
-      <Panel title="이미지 생성" subtitle="완성 이미지를 확인하고 저장해요.">
-        <div className="grid gap-4 md:grid-cols-[1fr_260px]">
-          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-[#efd6ad] bg-[#fff0d8]">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <Panel title="결과" subtitle="완성 이미지를 확인하고 저장하세요.">
+        <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)]">
             {generatedImageUrl ? (
               <Image
                 alt="생성된 AI 이미지"
@@ -985,39 +1261,25 @@ function StepThreePage({
                 width={720}
               />
             ) : (
-              <div className="text-center text-[#9b6176]">
-                <Palette className="mx-auto size-16" />
-                <p className="mt-3 text-xl font-extrabold">완성 이미지가 여기에 표시됩니다</p>
-              </div>
+              <>
+                <Image
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 h-full w-full object-cover opacity-70"
+                  height={720}
+                  src={studioAssets.emptyPreview}
+                  width={720}
+                />
+                <div className="relative rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/88 px-5 py-4 text-center text-[var(--studio-subtle)] shadow-[var(--studio-shadow-xs)] backdrop-blur-sm">
+                  <Palette className="mx-auto size-14" />
+                  <p className="mt-3 text-lg font-extrabold text-[var(--studio-ink)]">완성 이미지 대기 중</p>
+                </div>
+              </>
             )}
           </div>
 
-          <div className="space-y-3 rounded-lg border border-[#efd6ad] bg-[#fff0d8] p-4">
-            <p className="text-sm font-extrabold text-[#d16f91]">선택한 레퍼런스</p>
-            <p className="text-xl font-extrabold">{selectedStyle?.name}</p>
-            <p className="text-sm font-semibold leading-6 text-[#7c5566]">
-              완성되면 보관함에 저장됩니다. 이 기기에서 최근 2개까지 다시 볼 수 있어요.
-            </p>
-            <p className="rounded-md bg-white px-3 py-2 text-sm font-extrabold text-[#7c5566]">
-              남은 생성 횟수 {remainingCount}/5
-            </p>
-            <PrimaryButton className="sm:w-full" disabled={isGenerating || hasReachedLimit} onClick={onGenerate}>
-              {isGenerating ? (
-                <Loader2 className="size-5 animate-spin" />
-              ) : (
-                <Sparkles className="size-5" />
-              )}
-              AI 이미지 생성하기
-            </PrimaryButton>
-            <SecondaryButton className="sm:w-full" disabled={!generatedImageUrl} onClick={() => saveImage(generatedImageUrl)}>
-              <Download className="size-5" />
-              현재 이미지 다운로드
-            </SecondaryButton>
-          </div>
-        </div>
-
         {statusMessage && (
-          <div className="mt-4 flex items-center gap-2 rounded-lg border border-[#6ebfc4] bg-[#e8fbfb] p-3 text-sm font-extrabold text-[#277077]">
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-[rgb(86_127_132_/_0.34)] bg-[rgb(86_127_132_/_0.10)] p-3 text-sm font-bold text-[var(--studio-teal)]">
             <CheckCircle2 className="size-5" />
             {statusMessage}
           </div>
@@ -1032,12 +1294,66 @@ function StepThreePage({
         </div>
       </Panel>
 
-      <Panel title="완성 이미지 보관함" subtitle={appCopy.history.description}>
-        {savedHistory.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {savedHistory.map((item) => (
-              <div
-                className="overflow-hidden rounded-lg border border-[#efd6ad] bg-white"
+      <Panel title="생성 컨트롤" subtitle="레퍼런스와 횟수를 확인하세요.">
+        <div className="space-y-3 rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)] p-4">
+          <p className="text-sm font-bold text-[var(--studio-clay)]">선택한 레퍼런스</p>
+          <p className="text-pretty text-xl font-extrabold">{selectedStyle?.name}</p>
+          <p className="rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/72 px-3 py-2 text-sm font-bold text-[var(--studio-subtle)]">
+            남은 횟수 {remainingCount}/5
+          </p>
+          <PrimaryButton className="sm:w-full" disabled={isGenerating || hasReachedLimit} onClick={onGenerate}>
+            {isGenerating ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : (
+              <Sparkles className="size-5" />
+            )}
+            AI 이미지 생성
+          </PrimaryButton>
+          <SecondaryButton className="sm:w-full" disabled={!generatedImageUrl} onClick={() => saveImage(generatedImageUrl)}>
+            <Download className="size-5" />
+            다운로드
+          </SecondaryButton>
+        </div>
+      </Panel>
+
+    </div>
+  );
+}
+
+function StepFourPage({
+  generatedImageUrl,
+  history,
+  onSelectSaved,
+}: {
+  generatedImageUrl: string;
+  history: GeneratedImageHistoryItem[];
+  onSelectSaved: (imageUrl: string) => void;
+}) {
+  const galleryItems = history;
+  const selectedItem = generatedImageUrl || galleryItems[0]?.imageUrl || studioAssets.livingPreview;
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <Panel title="Gallery" subtitle="완성 이미지를 확인하고 다시 사용하세요.">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <button className="studio-chip-active h-9 rounded-md px-3 text-sm font-bold" type="button">
+            전체
+          </button>
+          <div className="flex gap-2">
+            <div className="h-9 rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/72 px-4 text-sm font-bold leading-9 text-[var(--studio-subtle)]">
+              최근순
+            </div>
+            <div className="h-9 rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/72 px-4 text-sm font-bold leading-9 text-[var(--studio-subtle)]">
+              검색
+            </div>
+          </div>
+        </div>
+
+        {galleryItems.length > 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {galleryItems.map((item, index) => (
+              <article
+                className="studio-thumbnail overflow-hidden rounded-md"
                 key={item.id}
               >
                 <button
@@ -1047,28 +1363,69 @@ function StepThreePage({
                 >
                   <Image
                     alt="저장된 완성 이미지"
-                    className="aspect-square w-full object-cover"
-                    height={260}
+                    className="aspect-[4/3] w-full object-cover"
+                    height={360}
                     src={item.imageUrl}
                     unoptimized
-                    width={260}
+                    width={480}
                   />
                 </button>
-                <div className="p-2">
+                <div className="flex items-center justify-between gap-2 p-3">
+                  <div>
+                    <p className="text-sm font-extrabold">완성 이미지 {index + 1}</p>
+                    <p className="text-xs font-semibold text-[var(--studio-subtle)]">
+                      저장됨
+                    </p>
+                  </div>
                   <button
-                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[#efd6ad] bg-[#fff0d8] text-sm font-extrabold text-[#7c5566]"
+                    className="studio-button-secondary flex size-9 items-center justify-center rounded-full"
                     onClick={() => saveImage(item.imageUrl)}
                     type="button"
                   >
                     <Download className="size-4" />
-                    다운로드
                   </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {[studioAssets.livingPreview, studioAssets.materialBoard, studioAssets.emptyPreview].map((src, index) => (
+              <div className="studio-thumbnail overflow-hidden rounded-md" key={src}>
+                <Image
+                  alt="갤러리 예시"
+                  className="aspect-[4/3] w-full object-cover"
+                  height={360}
+                  src={src}
+                  width={480}
+                />
+                <div className="p-3">
+                  <p className="text-sm font-extrabold">Showroom Sample {index + 1}</p>
                 </div>
               </div>
             ))}
           </div>
+        )}
+      </Panel>
+
+      <Panel title="선택 이미지" subtitle="이미지를 저장하거나 다시 확인하세요.">
+        {selectedItem ? (
+          <>
+            <Image
+              alt="선택 이미지"
+              className="aspect-[4/3] w-full rounded-lg border border-[var(--studio-line)] object-cover"
+              height={360}
+              src={selectedItem}
+              unoptimized={selectedItem.startsWith("data:")}
+              width={480}
+            />
+            <SecondaryButton className="mt-4 sm:w-full" onClick={() => saveImage(selectedItem)}>
+              <Download className="size-5" />
+              다운로드
+            </SecondaryButton>
+          </>
         ) : (
-          <div className="flex min-h-56 items-center justify-center rounded-lg border border-dashed border-[#d8b985] bg-[#fff0d8] p-6 text-center text-[#9b6176]">
+          <div className="flex min-h-72 items-center justify-center rounded-lg border border-dashed border-[var(--studio-line)] bg-[var(--studio-paper)] p-6 text-center text-[var(--studio-subtle)]">
             <p className="text-lg font-extrabold">아직 저장된 이미지가 없어요.</p>
           </div>
         )}
@@ -1089,10 +1446,10 @@ function Panel({
   title: string;
 }) {
   return (
-    <section className={cn("rounded-lg border border-[#efd6ad] bg-white p-4 shadow-[0_4px_0_#f0d7ab]", className)}>
-      <div className="mb-4">
+    <section className={cn("studio-panel min-w-0 rounded-xl p-4 sm:p-5", className)}>
+      <div className="mb-4 border-b border-[var(--studio-line)] pb-4">
         <h2 className="text-balance text-2xl font-extrabold">{title}</h2>
-        <p className="mt-1 text-pretty text-sm font-semibold leading-6 text-[#d16f91]">{subtitle}</p>
+        <p className="mt-1 text-pretty text-sm font-semibold leading-6 text-[var(--studio-clay)]">{subtitle}</p>
       </div>
       {children}
     </section>
@@ -1113,7 +1470,7 @@ function PrimaryButton({
   return (
     <button
       className={cn(
-        "inline-flex h-[52px] min-h-[52px] w-full items-center justify-center gap-2 rounded-md bg-[#f4bf5f] px-5 text-base font-extrabold text-[#2b2b22] shadow-[0_4px_0_#d97896] transition-opacity disabled:opacity-50 sm:w-auto",
+        "studio-button-primary inline-flex h-[52px] min-h-[52px] w-full items-center justify-center gap-2 rounded-md px-5 text-base font-extrabold transition-all hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 sm:w-auto",
         className,
       )}
       disabled={disabled}
@@ -1139,7 +1496,7 @@ function SecondaryButton({
   return (
     <button
       className={cn(
-        "inline-flex h-12 w-full items-center justify-center gap-2 rounded-md border border-[#efd6ad] bg-white px-5 text-sm font-extrabold text-[#7c5566] transition-opacity disabled:opacity-50 sm:w-auto",
+        "studio-button-secondary inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-5 text-sm font-bold transition-colors disabled:opacity-50 sm:w-auto",
         className,
       )}
       disabled={disabled}
@@ -1153,7 +1510,7 @@ function SecondaryButton({
 
 function AlertMessage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-4 rounded-lg border border-[#d97896] bg-[#fff0f4] p-3 text-sm font-extrabold text-[#b74770]">
+    <div className="mt-4 rounded-lg border border-[rgb(180_92_106_/_0.38)] bg-[rgb(180_92_106_/_0.10)] p-3 text-sm font-bold text-[var(--destructive)]">
       {children}
     </div>
   );
@@ -1164,20 +1521,20 @@ function GuideModal({ onClose }: { onClose: () => void }) {
     <div
       aria-label={guideCopy.title}
       aria-modal="true"
-      className="fixed inset-0 z-50 bg-[#fff7ea]/80 p-4 backdrop-blur"
+      className="fixed inset-0 z-50 bg-[#f6f0e7]/84 p-4 backdrop-blur"
       role="dialog"
     >
-      <div className="mx-auto max-h-[calc(100vh-2rem)] max-w-2xl overflow-auto rounded-lg border border-[#efd6ad] bg-white p-5 shadow-[0_4px_0_#f0d7ab]">
+      <div className="studio-surface mx-auto max-h-[calc(100vh-2rem)] max-w-2xl overflow-auto rounded-xl p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-extrabold text-[#d16f91]">프롬프트 가이드</p>
+            <p className="text-sm font-bold text-[var(--studio-clay)]">프롬프트 가이드</p>
             <h2 className="text-2xl font-extrabold">{guideCopy.title}</h2>
-            <p className="mt-2 text-sm font-semibold leading-6 text-[#7c5566]">
+            <p className="mt-2 text-sm font-semibold leading-6 text-[var(--studio-subtle)]">
               {guideCopy.description}
             </p>
           </div>
           <button
-            className="flex size-10 items-center justify-center rounded-md border border-[#efd6ad] bg-white"
+            className="studio-button-secondary flex size-10 items-center justify-center rounded-md"
             onClick={onClose}
             type="button"
           >
@@ -1186,21 +1543,27 @@ function GuideModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          {guideCopy.sections.map((section) => (
+          {guideCopy.sections.map((section, index) => {
+            const Icon = steps[index]?.icon ?? Palette;
+
+            return (
             <div
-              className="rounded-lg border border-[#efd6ad] bg-[#fff0d8] p-4"
+              className="studio-workbench rounded-lg p-4"
               key={section.title}
             >
-              <p className="text-2xl">{section.emoji}</p>
-              <h3 className="mt-2 font-extrabold">{section.title}</h3>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#7c5566]">
+              <span className="flex size-9 items-center justify-center rounded-md bg-[var(--studio-panel)] text-[var(--studio-sage)] shadow-[var(--studio-shadow-xs)]">
+                <Icon className="size-4" />
+              </span>
+              <h3 className="mt-3 font-extrabold">{section.title}</h3>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[var(--studio-subtle)]">
                 {section.example}
               </p>
             </div>
-          ))}
+            );
+          })}
         </div>
 
-        <div className="mt-4 rounded-lg border border-dashed border-[#d8b985] bg-[#fffaf1] p-4 text-sm font-extrabold leading-7">
+        <div className="mt-4 rounded-lg border border-dashed border-[var(--studio-line)] bg-[var(--studio-paper)] p-4 text-sm font-extrabold leading-7">
           {guideCopy.template}
         </div>
       </div>
