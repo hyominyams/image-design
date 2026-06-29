@@ -782,7 +782,7 @@ function HomePage({
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-xl border border-[var(--studio-line)] bg-[#fffdfa]/64 p-3 lg:grid-cols-3">
+      <div className="grid gap-3 rounded-xl border border-[var(--studio-line)] bg-[#fffdfa]/64 p-3 md:grid-cols-2">
         {steps.map((step, index) => {
           const Icon = step.icon;
 
