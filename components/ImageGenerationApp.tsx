@@ -485,7 +485,8 @@ function StudioSidebar({
   currentPage: AppPage;
   onNavigate: (page: AppPage) => void;
 }) {
-  const isCreateActive = currentPage !== "step-4";
+  const isHomeActive = currentPage === "home";
+  const isCreateActive = currentPage !== "home" && currentPage !== "step-4";
   const isGalleryActive = currentPage === "step-4";
 
   return (
@@ -500,6 +501,24 @@ function StudioSidebar({
       </button>
 
       <nav className="flex gap-2 lg:mt-8 lg:flex-col" aria-label="사이드바">
+        <button
+          className={cn(
+            "flex h-11 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-bold transition-colors",
+            isHomeActive
+              ? "bg-[#f3eadf] text-[var(--studio-clay)]"
+              : "text-[var(--studio-subtle)] hover:bg-[#f3eadf]/72",
+          )}
+          onClick={() => onNavigate("home")}
+          onPointerEnter={(event) => {
+            if (event.pointerType === "mouse" && !isHomeActive) {
+              onNavigate("home");
+            }
+          }}
+          type="button"
+        >
+          <Home className="size-4" />
+          Home
+        </button>
         <button
           className={cn(
             "flex h-11 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-bold transition-colors",
