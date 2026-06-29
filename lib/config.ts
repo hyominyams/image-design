@@ -20,6 +20,7 @@ export const uploadConfig = {
 
 export const imageSizeOptions = [
   { label: "정사각형", value: "1024x1024" },
+  { label: "16:9 가로형", value: "1536x864" },
   { label: "가로형", value: "1536x1024" },
   { label: "세로형", value: "1024x1536" },
 ] as const;

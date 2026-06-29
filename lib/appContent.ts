@@ -88,6 +88,8 @@ export const appCopy = {
   errors: {
     imageRequired: "참고 이미지를 다시 확인해 주세요.",
     descriptionRequired: "프롬프트를 작성해 주세요.",
+    productNameRequired: "제품명을 입력해 주세요.",
+    productDetailRequired: "제품의 재료와 기능을 입력해 주세요.",
     styleRequired: "레퍼런스 디자인을 선택해 주세요.",
     limitReached: "이미지 생성 가능 횟수를 모두 사용했습니다.",
     fileTooLarge: "이미지 파일 크기는 5MB 이하로 올려 주세요.",

@@ -11,6 +11,8 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 type GenerateImageRequest = {
+  productDetailDescription?: string;
+  productName?: string;
   uploadedImageBase64?: string;
   imageSize?: string;
   prompt?: string;
@@ -175,8 +177,10 @@ export async function POST(request: NextRequest) {
     ? parseDataUrl(body.uploadedImageBase64)
     : null;
   const prompt = (body.prompt ?? body.studentDescription)?.trim() ?? "";
-  const imageSize = getImageSize(body.imageSize);
   const selectedStyle = getStylePreset(body.styleId ?? "none");
+  const productName = body.productName?.trim() ?? "";
+  const productDetailDescription = body.productDetailDescription?.trim() ?? "";
+  const imageSize = selectedStyle?.forcedImageSize ?? getImageSize(body.imageSize);
 
   if (
     uploadedImage &&
@@ -198,6 +202,20 @@ export async function POST(request: NextRequest) {
   if (!selectedStyle) {
     return NextResponse.json(
       { success: false, error: "Selected style is invalid." },
+      { status: 400 },
+    );
+  }
+
+  if (selectedStyle.requiresProductName && !productName) {
+    return NextResponse.json(
+      { success: false, error: "제품명을 입력해 주세요." },
+      { status: 400 },
+    );
+  }
+
+  if (selectedStyle.requiresProductDetail && !productDetailDescription) {
+    return NextResponse.json(
+      { success: false, error: "제품의 재료와 기능을 입력해 주세요." },
       { status: 400 },
     );
   }
@@ -245,6 +263,8 @@ export async function POST(request: NextRequest) {
     const imagePrompt = buildImagePrompt(selectedStyle, prompt, {
       hasUploadedImage: Boolean(imageFile),
       hasReferenceImages: selectedStyle.referenceImages.length > 0,
+      productDetailDescription,
+      productName,
     });
 
     const result =

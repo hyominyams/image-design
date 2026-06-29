@@ -3,8 +3,27 @@ import type { StylePreset } from "@/lib/stylePresets";
 export function buildImagePrompt(
   style: StylePreset,
   prompt: string,
-  options: { hasUploadedImage: boolean; hasReferenceImages: boolean },
+  options: {
+    hasUploadedImage: boolean;
+    hasReferenceImages: boolean;
+    productDetailDescription?: string;
+    productName?: string;
+  },
 ) {
+  const productContext = [
+    options.productName
+      ? `Product name: "${options.productName}". Use this as product identity/context. Do not add it as visible text unless the user explicitly asks for text.`
+      : "",
+    options.productDetailDescription
+      ? `Product detail focus: ${options.productDetailDescription}. Make the visible product details match these materials, parts, and functions.`
+      : "",
+    style.forcedImageSize
+      ? `Required output framing: ${style.forcedImageSize} wide landscape. Keep the composition suitable for a product detail page hero image.`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
   return `${style.systemPrompt}
 
 Priority order:
@@ -15,6 +34,7 @@ Priority order:
 Selected reference design: ${style.name} (${style.category}).
 ${options.hasUploadedImage ? "If an uploaded image is present, treat it as a user-provided reference. Keep only the parts that support the prompt, such as subject identity, pose, composition, color, texture, or object details. If the prompt conflicts with the uploaded image, follow the prompt." : "No user image was uploaded. Create the image directly from the prompt."}
 ${options.hasReferenceImages ? "The selected reference design image is a style sample with unrelated sample content. Do not copy or reuse the sample subject, character, book, cup, table, window, room layout, props, or composition unless the user prompt explicitly asks for them. Transfer the visual language, not the scene." : "No reference design was selected. Do not force a preset style beyond what the prompt requests."}
+${productContext ? `\nProduct context:\n${productContext}` : ""}
 Create one coherent finished image for the user's requested use case.
 
 User prompt:

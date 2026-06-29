@@ -160,6 +160,8 @@ export function ImageGenerationApp() {
   const [page, setPage] = useState<AppPage>("home");
   const [uploadedImage, setUploadedImage] = useState<UploadedImage | null>(null);
   const [studentDescription, setStudentDescription] = useState("");
+  const [productName, setProductName] = useState("");
+  const [productDetailDescription, setProductDetailDescription] = useState("");
   const [selectedImageSize, setSelectedImageSize] = useState<ImageSize>(defaultImageSize);
   const [selectedStyleId, setSelectedStyleId] = useState(stylePresets[0]?.id ?? "");
   const [generationCount, setGenerationCountState] = useState(0);
@@ -177,7 +179,12 @@ export function ImageGenerationApp() {
   const remainingCount = Math.max(generationConfig.maxCount - generationCount, 0);
   const hasReachedLimit = generationCount >= generationConfig.maxCount;
   const canOpenStyleStep = Boolean(studentDescription.trim());
-  const canOpenGenerateStep = Boolean(canOpenStyleStep && selectedStyle);
+  const hasRequiredProductName = !selectedStyle?.requiresProductName || Boolean(productName.trim());
+  const hasRequiredProductDetail =
+    !selectedStyle?.requiresProductDetail || Boolean(productDetailDescription.trim());
+  const canOpenGenerateStep = Boolean(
+    canOpenStyleStep && selectedStyle && hasRequiredProductName && hasRequiredProductDetail,
+  );
 
   useEffect(() => {
     document.documentElement.classList.remove("dark");
@@ -197,14 +204,18 @@ export function ImageGenerationApp() {
           return;
         }
 
-        setUploadedImage(draft.uploadedImage);
-        setStudentDescription(draft.studentDescription);
-        setSelectedImageSize(draft.selectedImageSize);
-        setSelectedStyleId(
+        const restoredStyle = stylePresets.find((style) => style.id === draft.selectedStyleId);
+        const restoredStyleId =
           stylePresets.some((style) => style.id === draft.selectedStyleId)
             ? draft.selectedStyleId
-            : stylePresets[0]?.id || "",
-        );
+            : stylePresets[0]?.id || "";
+
+        setUploadedImage(draft.uploadedImage);
+        setStudentDescription(draft.studentDescription);
+        setProductName(draft.productName);
+        setProductDetailDescription(draft.productDetailDescription);
+        setSelectedImageSize(restoredStyle?.forcedImageSize ?? draft.selectedImageSize);
+        setSelectedStyleId(restoredStyleId);
         setGeneratedImageUrl(draft.generatedImageUrl);
         hasLoadedDraftRef.current = true;
       });
@@ -226,6 +237,8 @@ export function ImageGenerationApp() {
     const draft: AppDraftState = {
       uploadedImage,
       studentDescription,
+      productName,
+      productDetailDescription,
       selectedImageSize,
       selectedStyleId,
       generatedImageUrl,
@@ -239,6 +252,8 @@ export function ImageGenerationApp() {
     };
   }, [
     generatedImageUrl,
+    productDetailDescription,
+    productName,
     selectedImageSize,
     selectedStyleId,
     studentDescription,
@@ -299,6 +314,17 @@ export function ImageGenerationApp() {
       return appCopy.errors.styleRequired;
     }
 
+    if (selectedStyle.requiresProductName && !productName.trim()) {
+      return appCopy.errors.productNameRequired;
+    }
+
+    if (
+      selectedStyle.requiresProductDetail &&
+      !productDetailDescription.trim()
+    ) {
+      return appCopy.errors.productDetailRequired;
+    }
+
     if (hasReachedLimit) {
       return appCopy.errors.limitReached;
     }
@@ -317,9 +343,22 @@ export function ImageGenerationApp() {
     goToPage("step-2");
   }
 
+  function handleSelectStyle(styleId: string) {
+    const nextStyle = stylePresets.find((style) => style.id === styleId);
+
+    setSelectedStyleId(styleId);
+    setErrorMessage("");
+
+    if (nextStyle?.forcedImageSize) {
+      setSelectedImageSize(nextStyle.forcedImageSize);
+    }
+  }
+
   function goToGenerateStep() {
-    if (!selectedStyle) {
-      setErrorMessage(appCopy.errors.styleRequired);
+    const validationError = validateGenerate();
+
+    if (validationError) {
+      setErrorMessage(validationError);
       return;
     }
 
@@ -346,8 +385,10 @@ export function ImageGenerationApp() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          productDetailDescription: productDetailDescription.trim(),
+          productName: productName.trim(),
           uploadedImageBase64: uploadedImage?.dataUrl,
-          imageSize: selectedImageSize,
+          imageSize: selectedStyle.forcedImageSize ?? selectedImageSize,
           prompt: studentDescription.trim(),
           styleId: selectedStyle.id,
         }),
@@ -428,6 +469,7 @@ export function ImageGenerationApp() {
                     onFileChange={handleFileChange}
                     onGuideOpen={() => setIsGuideOpen(true)}
                     onNext={goToStyleStep}
+                    forcedImageSize={selectedStyle?.forcedImageSize}
                     selectedImageSize={selectedImageSize}
                     setSelectedImageSize={setSelectedImageSize}
                     setStudentDescription={setStudentDescription}
@@ -440,9 +482,20 @@ export function ImageGenerationApp() {
                   <StepTwoPage
                     onBack={() => goToPage("step-1")}
                     onNext={goToGenerateStep}
-                    onSelect={setSelectedStyleId}
+                    onSelect={handleSelectStyle}
+                    errorMessage={errorMessage}
+                    productDetailDescription={productDetailDescription}
+                    productName={productName}
                     selectedStyle={selectedStyle}
                     selectedStyleId={selectedStyleId}
+                    setProductDetailDescription={(description) => {
+                      setProductDetailDescription(description);
+                      setErrorMessage("");
+                    }}
+                    setProductName={(name) => {
+                      setProductName(name);
+                      setErrorMessage("");
+                    }}
                   />
                 )}
 
@@ -886,6 +939,7 @@ function StepShell({
 function StepOnePage({
   errorMessage,
   fileInputRef,
+  forcedImageSize,
   onClearImage,
   onFileChange,
   onGuideOpen,
@@ -898,6 +952,7 @@ function StepOnePage({
 }: {
   errorMessage: string;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
+  forcedImageSize?: ImageSize;
   onClearImage: () => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onGuideOpen: () => void;
@@ -1033,8 +1088,9 @@ function StepOnePage({
           </span>
           <select
             className="studio-focus h-11 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] px-3 text-sm font-bold text-[var(--studio-ink)]"
+            disabled={Boolean(forcedImageSize)}
             onChange={(event) => setSelectedImageSize(event.target.value as ImageSize)}
-            value={selectedImageSize}
+            value={forcedImageSize ?? selectedImageSize}
           >
             {imageSizeOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -1042,6 +1098,11 @@ function StepOnePage({
               </option>
             ))}
           </select>
+          {forcedImageSize && (
+            <span className="sm:col-start-2 text-xs font-bold text-[var(--studio-clay)]">
+              제품 히어로컷은 16:9 가로형으로 생성됩니다
+            </span>
+          )}
         </label>
         <div className="mt-3 rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/58 p-4">
           <p className="mb-3 text-sm font-bold text-[var(--studio-clay)]">프롬프트 예시</p>
@@ -1078,17 +1139,27 @@ function StepOnePage({
 }
 
 function StepTwoPage({
+  errorMessage,
   onBack,
   onNext,
   onSelect,
+  productDetailDescription,
+  productName,
   selectedStyle,
   selectedStyleId,
+  setProductDetailDescription,
+  setProductName,
 }: {
+  errorMessage: string;
   onBack: () => void;
   onNext: () => void;
   onSelect: (styleId: string) => void;
+  productDetailDescription: string;
+  productName: string;
   selectedStyle?: StylePreset;
   selectedStyleId: string;
+  setProductDetailDescription: (description: string) => void;
+  setProductName: (name: string) => void;
 }) {
   const [selectedCategory, setSelectedCategory] = useState("전체");
   const visibleStylePresets = useMemo(
@@ -1150,7 +1221,12 @@ function StepTwoPage({
               {style.thumbnail ? (
                 <Image
                   alt={`${style.name} 썸네일`}
-                  className="aspect-[4/5] w-full object-cover"
+                  className={cn(
+                    "aspect-[4/5] w-full",
+                    style.forcedImageSize
+                      ? "bg-[var(--studio-paper)] object-contain p-2"
+                      : "object-cover",
+                  )}
                   height={320}
                   src={style.thumbnail}
                   width={240}
@@ -1190,7 +1266,10 @@ function StepTwoPage({
             {selectedStyle.thumbnail ? (
               <Image
                 alt={`${selectedStyle.name} 미리보기`}
-                className="aspect-[4/5] w-full rounded-lg border border-[var(--studio-line)] object-cover"
+                className={cn(
+                  "w-full rounded-lg border border-[var(--studio-line)] object-cover",
+                  selectedStyle.forcedImageSize ? "aspect-video" : "aspect-[4/5]",
+                )}
                 height={520}
                 src={selectedStyle.thumbnail}
                 width={390}
@@ -1204,6 +1283,47 @@ function StepTwoPage({
             <p className="mt-2 text-pretty text-base font-semibold leading-7 text-[var(--studio-subtle)]">
               {selectedStyle.description}
             </p>
+            {selectedStyle.forcedImageSize && (
+              <p className="mt-3 rounded-md border border-[rgb(86_127_132_/_0.28)] bg-[rgb(86_127_132_/_0.10)] px-3 py-2 text-sm font-extrabold text-[var(--studio-teal)]">
+                16:9 가로형
+              </p>
+            )}
+            {(selectedStyle.requiresProductName || selectedStyle.requiresProductDetail) && (
+              <div className="mt-4 space-y-3 rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/68 p-4">
+                {selectedStyle.requiresProductName && (
+                  <label className="block">
+                    <span className="text-sm font-extrabold text-[var(--studio-ink)]">
+                      제품명
+                    </span>
+                    <input
+                      className="studio-focus mt-2 h-11 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] px-3 text-sm font-bold text-[var(--studio-ink)] placeholder:text-[var(--studio-subtle)]"
+                      maxLength={60}
+                      onChange={(event) => setProductName(event.target.value)}
+                      placeholder="예: 모듈형 스마트 책상 조명"
+                      value={productName}
+                    />
+                  </label>
+                )}
+                {selectedStyle.requiresProductDetail && (
+                  <label className="block">
+                    <span className="text-sm font-extrabold text-[var(--studio-ink)]">
+                      제품 디테일
+                    </span>
+                    <textarea
+                      className="studio-focus mt-2 min-h-28 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] px-3 py-3 text-sm font-bold leading-6 text-[var(--studio-ink)] placeholder:text-[var(--studio-subtle)]"
+                      maxLength={260}
+                      onChange={(event) => setProductDetailDescription(event.target.value)}
+                      placeholder="재료, 기능, 보여주고 싶은 부분을 적어 주세요."
+                      value={productDetailDescription}
+                    />
+                    <span className="mt-2 block text-xs font-bold text-[var(--studio-subtle)]">
+                      {productDetailDescription.length}/260
+                    </span>
+                  </label>
+                )}
+              </div>
+            )}
+            {errorMessage && <AlertMessage>{errorMessage}</AlertMessage>}
           </>
         )}
       </Panel>
@@ -1273,7 +1393,12 @@ function StepThreePage({
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
       <Panel title="결과" subtitle="완성 이미지를 확인하고 저장하세요.">
-        <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)]">
+        <div
+          className={cn(
+            "relative flex items-center justify-center overflow-hidden rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)]",
+            selectedStyle?.forcedImageSize ? "aspect-video" : "aspect-square",
+          )}
+        >
             {generatedImageUrl ? (
               <Image
                 alt="생성된 AI 이미지"

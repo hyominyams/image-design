@@ -19,6 +19,8 @@ export type AppDraftState = {
     name: string;
   } | null;
   studentDescription: string;
+  productName: string;
+  productDetailDescription: string;
   selectedImageSize: ImageSize;
   selectedStyleId: string;
   generatedImageUrl: string;
@@ -69,6 +71,11 @@ function normalizeDraftState(value: unknown): AppDraftState | null {
     uploadedImage,
     studentDescription:
       typeof draft.studentDescription === "string" ? draft.studentDescription : "",
+    productName: typeof draft.productName === "string" ? draft.productName : "",
+    productDetailDescription:
+      typeof draft.productDetailDescription === "string"
+        ? draft.productDetailDescription
+        : "",
     selectedImageSize: isImageSize(draft.selectedImageSize)
       ? draft.selectedImageSize
       : defaultImageSize,

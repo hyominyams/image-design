@@ -1,3 +1,5 @@
+import type { ImageSize } from "@/lib/config";
+
 export type StylePreset = {
   id: string;
   name: string;
@@ -7,6 +9,9 @@ export type StylePreset = {
   thumbnail?: string;
   referenceImages: string[];
   accentClass: string;
+  forcedImageSize?: ImageSize;
+  requiresProductName?: boolean;
+  requiresProductDetail?: boolean;
 };
 
 const generatedReferenceBasePath = "/styles/generated-references/tiles";
@@ -133,6 +138,42 @@ export const stylePresets: StylePreset[] = [
     prompt:
       "clean studio photography, controlled soft lighting, sharp subject detail, premium material focus",
   }),
+  {
+    id: "product-hero-shot",
+    name: "제품 히어로컷",
+    description: "상세페이지 첫 화면용 16:9 대표 이미지",
+    category: "제품 상세",
+    systemPrompt:
+      "Create an ecommerce product detail page hero shot. Use a forced wide 16:9 landscape composition, premium product photography, clear main product presence, polished studio styling, generous negative space, and a refined commercial finish. Use the reference image as product presentation evidence only, not as content evidence. Preserve the user's requested product concept, features, materials, and intent.",
+    thumbnail: referencePath("product-hero-shot"),
+    referenceImages: [referencePath("product-hero-shot")],
+    accentClass: "bg-secondary",
+    forcedImageSize: "1536x864",
+    requiresProductName: true,
+  },
+  {
+    id: "product-in-use-shot",
+    name: "사용 장면컷",
+    description: "제품이 실제로 쓰이는 생활 장면",
+    category: "제품 상세",
+    systemPrompt:
+      "Create a realistic product-in-use scene for an ecommerce detail page. Show the product naturally used in context, with believable scale, clean surroundings, natural interaction, and clear product visibility. Use the reference image as product presentation evidence only, not as content evidence. Preserve the user's requested product concept, features, materials, and intent.",
+    thumbnail: referencePath("product-in-use-shot"),
+    referenceImages: [referencePath("product-in-use-shot")],
+    accentClass: "bg-secondary",
+  },
+  {
+    id: "product-detail-shot",
+    name: "디테일컷",
+    description: "재료와 기능을 가까이 보여주는 클로즈업",
+    category: "제품 상세",
+    systemPrompt:
+      "Create a product detail close-up for an ecommerce detail page. Emphasize material, construction, key functional parts, surface texture, seams, buttons, openings, or other useful product details. Use macro product photography language with crisp feature clarity and controlled lighting. Use the reference image as product presentation evidence only, not as content evidence. Preserve the user's requested product concept, features, materials, and intent.",
+    thumbnail: referencePath("product-detail-shot"),
+    referenceImages: [referencePath("product-detail-shot")],
+    accentClass: "bg-secondary",
+    requiresProductDetail: true,
+  },
   createReferencePreset({
     id: "cinematic-film-still",
     name: "영화 장면",
