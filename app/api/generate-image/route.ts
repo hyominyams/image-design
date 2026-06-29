@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import OpenAI, { APIError, toFile } from "openai";
 
-import { generationConfig } from "@/lib/config";
+import { defaultImageSize, generationConfig, imageSizeOptions } from "@/lib/config";
 import { buildImagePrompt } from "@/lib/imagePrompt";
 import { getStylePreset } from "@/lib/stylePresets";
 
@@ -12,6 +12,7 @@ export const maxDuration = 120;
 
 type GenerateImageRequest = {
   uploadedImageBase64?: string;
+  imageSize?: string;
   prompt?: string;
   studentDescription?: string;
   styleId?: string;
@@ -24,6 +25,12 @@ const missingApiKeyError =
 
 function getImageModel() {
   return process.env.OPENAI_IMAGE_MODEL ?? defaultImageModel;
+}
+
+function getImageSize(imageSize?: string) {
+  const selectedOption = imageSizeOptions.find((option) => option.value === imageSize);
+
+  return selectedOption?.value ?? defaultImageSize;
 }
 
 function parseDataUrl(dataUrl: string) {
@@ -168,6 +175,7 @@ export async function POST(request: NextRequest) {
     ? parseDataUrl(body.uploadedImageBase64)
     : null;
   const prompt = (body.prompt ?? body.studentDescription)?.trim() ?? "";
+  const imageSize = getImageSize(body.imageSize);
   const selectedStyle = getStylePreset(body.styleId ?? "none");
 
   if (
@@ -246,13 +254,13 @@ export async function POST(request: NextRequest) {
             model: imageModel,
             output_format: "png",
             prompt: imagePrompt,
-            size: "1024x1024",
+            size: imageSize,
           })
         : await openai.images.generate({
             model: imageModel,
             output_format: "png",
             prompt: imagePrompt,
-            size: "1024x1024",
+            size: imageSize,
           });
     const imageBase64 = result.data?.[0]?.b64_json;
 

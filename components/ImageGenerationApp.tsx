@@ -11,7 +11,6 @@ import {
   HelpCircle,
   Home,
   ImagePlus,
-  KeyRound,
   Loader2,
   Lock,
   Palette,
@@ -25,16 +24,24 @@ import {
 } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import { accessCodes } from "@/lib/accessCodes";
 import { appCopy } from "@/lib/appContent";
-import { generationConfig, uploadConfig } from "@/lib/config";
+import {
+  defaultImageSize,
+  generationConfig,
+  imageSizeOptions,
+  uploadConfig,
+  type ImageSize,
+} from "@/lib/config";
 import { guideCopy } from "@/lib/guideContent";
 import {
   addGeneratedImageHistory,
-  GeneratedImageHistoryItem,
+  getAppDraftState,
   getGeneratedImageHistory,
   getGenerationCount,
+  saveAppDraftState,
   setGenerationCount,
+  type AppDraftState,
+  type GeneratedImageHistoryItem,
 } from "@/lib/localStorage";
 import { StylePreset, styleCategories, stylePresets } from "@/lib/stylePresets";
 import { cn } from "@/lib/utils";
@@ -149,11 +156,11 @@ function getPageFromHash(): AppPage {
 
 export function ImageGenerationApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [hasCheckedAccess, setHasCheckedAccess] = useState(false);
-  const [hasAccess, setHasAccess] = useState(false);
+  const hasLoadedDraftRef = useRef(false);
   const [page, setPage] = useState<AppPage>("home");
   const [uploadedImage, setUploadedImage] = useState<UploadedImage | null>(null);
   const [studentDescription, setStudentDescription] = useState("");
+  const [selectedImageSize, setSelectedImageSize] = useState<ImageSize>(defaultImageSize);
   const [selectedStyleId, setSelectedStyleId] = useState(stylePresets[0]?.id ?? "");
   const [generationCount, setGenerationCountState] = useState(0);
   const [history, setHistory] = useState<GeneratedImageHistoryItem[]>([]);
@@ -181,11 +188,26 @@ export function ImageGenerationApp() {
     };
 
     const frameId = window.requestAnimationFrame(() => {
-      setHasAccess(window.localStorage.getItem(generationConfig.storageKeys.access) === "granted");
-      setHasCheckedAccess(true);
       syncPageFromHash();
       setGenerationCountState(getGenerationCount());
       void getGeneratedImageHistory().then(setHistory);
+      void getAppDraftState().then((draft) => {
+        if (!draft) {
+          hasLoadedDraftRef.current = true;
+          return;
+        }
+
+        setUploadedImage(draft.uploadedImage);
+        setStudentDescription(draft.studentDescription);
+        setSelectedImageSize(draft.selectedImageSize);
+        setSelectedStyleId(
+          stylePresets.some((style) => style.id === draft.selectedStyleId)
+            ? draft.selectedStyleId
+            : stylePresets[0]?.id || "",
+        );
+        setGeneratedImageUrl(draft.generatedImageUrl);
+        hasLoadedDraftRef.current = true;
+      });
     });
 
     window.addEventListener("hashchange", syncPageFromHash);
@@ -196,6 +218,33 @@ export function ImageGenerationApp() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!hasLoadedDraftRef.current) {
+      return;
+    }
+
+    const draft: AppDraftState = {
+      uploadedImage,
+      studentDescription,
+      selectedImageSize,
+      selectedStyleId,
+      generatedImageUrl,
+    };
+    const timeoutId = window.setTimeout(() => {
+      void saveAppDraftState(draft);
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    generatedImageUrl,
+    selectedImageSize,
+    selectedStyleId,
+    studentDescription,
+    uploadedImage,
+  ]);
+
   function goToPage(nextPage: AppPage) {
     setPage(nextPage);
     if (nextPage === "home") {
@@ -205,16 +254,6 @@ export function ImageGenerationApp() {
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
     setErrorMessage("");
-  }
-
-  function unlockWithCode(code: string) {
-    if (!accessCodes.some((accessCode) => accessCode === code)) {
-      return false;
-    }
-
-    window.localStorage.setItem(generationConfig.storageKeys.access, "granted");
-    setHasAccess(true);
-    return true;
   }
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -308,6 +347,7 @@ export function ImageGenerationApp() {
         },
         body: JSON.stringify({
           uploadedImageBase64: uploadedImage?.dataUrl,
+          imageSize: selectedImageSize,
           prompt: studentDescription.trim(),
           styleId: selectedStyle.id,
         }),
@@ -346,19 +386,11 @@ export function ImageGenerationApp() {
     }
   }
 
-  if (!hasCheckedAccess) {
-    return <main className="studio-shell min-h-screen" />;
-  }
-
-  if (!hasAccess) {
-    return <AccessCodePage onUnlock={unlockWithCode} />;
-  }
-
   return (
     <main className="studio-shell min-h-screen p-3 sm:p-4">
-      <div className="mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-[1540px] overflow-hidden rounded-xl border border-[var(--studio-line)] bg-[#fffdfa]/82 shadow-[var(--studio-shadow-md)] lg:grid-cols-[132px_minmax(0,1fr)]">
+      <div className="mx-auto grid h-[calc(100dvh-1.5rem)] min-h-[680px] w-full max-w-[1540px] overflow-hidden rounded-xl border border-[var(--studio-line)] bg-[#fffdfa]/82 shadow-[var(--studio-shadow-md)] sm:h-[calc(100dvh-2rem)] lg:grid-cols-[132px_minmax(0,1fr)]">
         <StudioSidebar currentPage={page} onNavigate={goToPage} />
-        <section className="min-w-0 border-t border-[var(--studio-line)] bg-[#fffdfa]/72 lg:border-l lg:border-t-0">
+        <section className="min-h-0 min-w-0 overflow-y-auto border-t border-[var(--studio-line)] bg-[#fffdfa]/72 lg:border-l lg:border-t-0">
           <AppHeader
             currentPage={page}
             onGuideOpen={() => setIsGuideOpen(true)}
@@ -396,6 +428,8 @@ export function ImageGenerationApp() {
                     onFileChange={handleFileChange}
                     onGuideOpen={() => setIsGuideOpen(true)}
                     onNext={goToStyleStep}
+                    selectedImageSize={selectedImageSize}
+                    setSelectedImageSize={setSelectedImageSize}
                     setStudentDescription={setStudentDescription}
                     studentDescription={studentDescription}
                     uploadedImage={uploadedImage}
@@ -444,69 +478,6 @@ export function ImageGenerationApp() {
   );
 }
 
-function AccessCodePage({ onUnlock }: { onUnlock: (code: string) => boolean }) {
-  const [code, setCode] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-
-  function submitCode() {
-    const normalizedCode = code.replace(/\D/g, "").slice(0, 6);
-
-    if (normalizedCode.length !== 6 || !onUnlock(normalizedCode)) {
-      setErrorMessage("접속 코드를 확인해 주세요.");
-      return;
-    }
-
-    setErrorMessage("");
-  }
-
-  return (
-    <main className="studio-shell relative isolate flex min-h-screen items-center justify-center overflow-hidden px-4 py-8">
-      <Image
-        alt=""
-        aria-hidden="true"
-        className="absolute inset-0 -z-20 h-full w-full object-cover opacity-30"
-        height={920}
-        priority
-        src={studioAssets.hero}
-        width={1280}
-      />
-      <div className="absolute inset-0 -z-10 bg-[#f6f0e7]/78" />
-      <section className="studio-surface w-full max-w-sm rounded-xl p-5">
-        <div className="flex size-11 items-center justify-center rounded-md bg-[var(--studio-panel-soft)] text-[var(--studio-clay)]">
-          <KeyRound className="size-6" />
-        </div>
-        <div className="mt-5">
-          <p className="text-sm font-bold text-[var(--studio-clay)]">AI 이미지 스튜디오</p>
-          <h1 className="mt-1 text-3xl font-extrabold leading-tight">접속 코드</h1>
-        </div>
-        <label className="mt-5 block">
-          <span className="text-sm font-bold text-[var(--studio-subtle)]">접속 코드</span>
-          <input
-            className="studio-focus mt-2 h-14 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] px-4 text-center text-2xl font-extrabold tracking-[0.28em]"
-            inputMode="numeric"
-            maxLength={6}
-            onChange={(event) => {
-              setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
-              setErrorMessage("");
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                submitCode();
-              }
-            }}
-            placeholder="000000"
-            value={code}
-          />
-        </label>
-        {errorMessage && <AlertMessage>{errorMessage}</AlertMessage>}
-        <PrimaryButton className="mt-5 sm:w-full" onClick={submitCode}>
-          입장 <ArrowRight className="size-5" />
-        </PrimaryButton>
-      </section>
-    </main>
-  );
-}
-
 function StudioSidebar({
   currentPage,
   onNavigate,
@@ -518,7 +489,7 @@ function StudioSidebar({
   const isGalleryActive = currentPage === "step-4";
 
   return (
-    <aside className="flex min-h-20 flex-row items-center gap-2 overflow-x-auto bg-[#fffdfa]/84 px-3 py-3 lg:min-h-0 lg:flex-col lg:items-stretch lg:overflow-visible lg:px-3 lg:py-5">
+    <aside className="flex h-20 shrink-0 flex-row items-center gap-2 overflow-x-auto bg-[#fffdfa]/84 px-3 py-3 lg:h-auto lg:min-h-0 lg:flex-col lg:items-stretch lg:overflow-visible lg:px-3 lg:py-5">
       <button
         className="flex shrink-0 items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-semibold text-[var(--studio-subtle)]"
         onClick={() => onNavigate("home")}
@@ -850,7 +821,7 @@ function StepShell({
 
   return (
     <section className="space-y-4">
-      <div className="studio-toolbar grid gap-2 rounded-xl p-2 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="studio-toolbar sticky top-0 z-20 grid gap-2 rounded-xl p-2 sm:grid-cols-2 xl:grid-cols-4">
         {steps.map((step, index) => {
           const Icon = step.icon;
           const available = isStepAvailable(step.page);
@@ -858,7 +829,7 @@ function StepShell({
           return (
             <button
               className={cn(
-                "flex min-h-14 items-center gap-3 rounded-md px-3 py-2 text-left transition-colors",
+                "flex h-[76px] items-center gap-3 rounded-md px-3 py-2 text-left transition-colors",
                 currentPage === step.page
                   ? "bg-[var(--studio-ink)] text-[#fffaf3]"
                   : "bg-transparent text-[var(--studio-subtle)] hover:bg-[#fffdfa]/72",
@@ -872,12 +843,17 @@ function StepShell({
               <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/64">
                 {available ? <Icon className="size-5" /> : <Lock className="size-5" />}
               </span>
-              <span>
+              <span className="grid min-h-[52px] content-center">
                 <span className="block text-xs font-extrabold">STEP {index + 1}</span>
                 <span className="block text-sm font-extrabold">{step.label}</span>
-                {!available && (
-                  <span className="mt-0.5 block text-[11px] font-extrabold">이전 단계 필요</span>
-                )}
+                <span
+                  className={cn(
+                    "mt-0.5 block h-[14px] text-[11px] font-extrabold leading-[14px]",
+                    available && "invisible",
+                  )}
+                >
+                  이전 단계 필요
+                </span>
               </span>
             </button>
           );
@@ -895,6 +871,8 @@ function StepOnePage({
   onFileChange,
   onGuideOpen,
   onNext,
+  selectedImageSize,
+  setSelectedImageSize,
   setStudentDescription,
   studentDescription,
   uploadedImage,
@@ -905,6 +883,8 @@ function StepOnePage({
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onGuideOpen: () => void;
   onNext: () => void;
+  selectedImageSize: ImageSize;
+  setSelectedImageSize: (imageSize: ImageSize) => void;
   setStudentDescription: (description: string) => void;
   studentDescription: string;
   uploadedImage: UploadedImage | null;
@@ -1023,6 +1003,27 @@ function StepOnePage({
           placeholder={appCopy.description.placeholder}
           value={studentDescription}
         />
+        <label className="mt-3 grid gap-2 rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/58 p-4 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
+          <span>
+            <span className="block text-sm font-extrabold text-[var(--studio-ink)]">
+              이미지 비율
+            </span>
+            <span className="mt-1 block text-xs font-bold text-[var(--studio-subtle)]">
+              결과 화면 크기
+            </span>
+          </span>
+          <select
+            className="studio-focus h-11 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] px-3 text-sm font-bold text-[var(--studio-ink)]"
+            onChange={(event) => setSelectedImageSize(event.target.value as ImageSize)}
+            value={selectedImageSize}
+          >
+            {imageSizeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="mt-3 rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/58 p-4">
           <p className="mb-3 text-sm font-bold text-[var(--studio-clay)]">프롬프트 예시</p>
           <div className="grid gap-2 text-sm font-semibold leading-6 text-[var(--studio-subtle)] sm:grid-cols-3">

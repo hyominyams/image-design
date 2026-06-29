@@ -1,4 +1,9 @@
-import { generationConfig } from "@/lib/config";
+import {
+  defaultImageSize,
+  generationConfig,
+  imageSizeOptions,
+  type ImageSize,
+} from "@/lib/config";
 
 export type GeneratedImageHistoryItem = {
   id: string;
@@ -6,6 +11,17 @@ export type GeneratedImageHistoryItem = {
   styleId: string;
   studentDescription: string;
   imageUrl: string;
+};
+
+export type AppDraftState = {
+  uploadedImage: {
+    dataUrl: string;
+    name: string;
+  } | null;
+  studentDescription: string;
+  selectedImageSize: ImageSize;
+  selectedStyleId: string;
+  generatedImageUrl: string;
 };
 
 function canUseStorage() {
@@ -18,11 +34,51 @@ function canUseIndexedDb() {
 
 const imageDbConfig = {
   name: "general_ai_image_db",
-  storeName: "generated_images",
-  version: 1,
+  historyStoreName: "generated_images",
+  draftStoreName: "app_drafts",
+  draftId: "current",
+  version: 2,
 } as const;
 
-function openImageHistoryDb() {
+type IndexedDbDraftRecord = AppDraftState & {
+  id: string;
+};
+
+function isImageSize(value: unknown): value is ImageSize {
+  return imageSizeOptions.some((option) => option.value === value);
+}
+
+function normalizeDraftState(value: unknown): AppDraftState | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const draft = value as Partial<AppDraftState>;
+  const uploadedImage =
+    draft.uploadedImage &&
+    typeof draft.uploadedImage === "object" &&
+    typeof draft.uploadedImage.dataUrl === "string" &&
+    typeof draft.uploadedImage.name === "string"
+      ? {
+          dataUrl: draft.uploadedImage.dataUrl,
+          name: draft.uploadedImage.name,
+        }
+      : null;
+
+  return {
+    uploadedImage,
+    studentDescription:
+      typeof draft.studentDescription === "string" ? draft.studentDescription : "",
+    selectedImageSize: isImageSize(draft.selectedImageSize)
+      ? draft.selectedImageSize
+      : defaultImageSize,
+    selectedStyleId: typeof draft.selectedStyleId === "string" ? draft.selectedStyleId : "",
+    generatedImageUrl:
+      typeof draft.generatedImageUrl === "string" ? draft.generatedImageUrl : "",
+  };
+}
+
+function openImageDb() {
   return new Promise<IDBDatabase>((resolve, reject) => {
     if (!canUseIndexedDb()) {
       reject(new Error("IndexedDB is not available."));
@@ -37,8 +93,12 @@ function openImageHistoryDb() {
     request.onupgradeneeded = () => {
       const db = request.result;
 
-      if (!db.objectStoreNames.contains(imageDbConfig.storeName)) {
-        db.createObjectStore(imageDbConfig.storeName, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(imageDbConfig.historyStoreName)) {
+        db.createObjectStore(imageDbConfig.historyStoreName, { keyPath: "id" });
+      }
+
+      if (!db.objectStoreNames.contains(imageDbConfig.draftStoreName)) {
+        db.createObjectStore(imageDbConfig.draftStoreName, { keyPath: "id" });
       }
     };
 
@@ -47,15 +107,16 @@ function openImageHistoryDb() {
   });
 }
 
-function runImageHistoryTransaction<T>(
+function runImageDbTransaction<T>(
+  storeName: string,
   mode: IDBTransactionMode,
   callback: (store: IDBObjectStore) => IDBRequest<T> | void,
 ) {
   return new Promise<T | undefined>((resolve, reject) => {
-    void openImageHistoryDb()
+    void openImageDb()
       .then((db) => {
-        const transaction = db.transaction(imageDbConfig.storeName, mode);
-        const store = transaction.objectStore(imageDbConfig.storeName);
+        const transaction = db.transaction(storeName, mode);
+        const store = transaction.objectStore(storeName);
         const request = callback(store);
         let result: T | undefined;
 
@@ -81,6 +142,20 @@ function runImageHistoryTransaction<T>(
       })
       .catch(reject);
   });
+}
+
+function runImageHistoryTransaction<T>(
+  mode: IDBTransactionMode,
+  callback: (store: IDBObjectStore) => IDBRequest<T> | void,
+) {
+  return runImageDbTransaction(imageDbConfig.historyStoreName, mode, callback);
+}
+
+function runDraftTransaction<T>(
+  mode: IDBTransactionMode,
+  callback: (store: IDBObjectStore) => IDBRequest<T> | void,
+) {
+  return runImageDbTransaction(imageDbConfig.draftStoreName, mode, callback);
 }
 
 function sortHistory(history: GeneratedImageHistoryItem[]) {
@@ -145,6 +220,47 @@ function setLocalStorageHistory(history: GeneratedImageHistoryItem[]) {
   }
 }
 
+function getLocalStorageDraftState() {
+  if (!canUseStorage()) {
+    return null;
+  }
+
+  const savedDraft = window.localStorage.getItem(generationConfig.storageKeys.draft);
+
+  if (!savedDraft) {
+    return null;
+  }
+
+  try {
+    return normalizeDraftState(JSON.parse(savedDraft));
+  } catch {
+    return null;
+  }
+}
+
+function setLocalStorageDraftState(draft: AppDraftState) {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      generationConfig.storageKeys.draft,
+      JSON.stringify(draft),
+    );
+  } catch {
+    window.localStorage.removeItem(generationConfig.storageKeys.draft);
+  }
+}
+
+function clearLocalStorageDraftState() {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  window.localStorage.removeItem(generationConfig.storageKeys.draft);
+}
+
 async function pruneIndexedDbHistory(history: GeneratedImageHistoryItem[]) {
   const itemsToDelete = history.slice(generationConfig.maxHistoryCount);
 
@@ -203,6 +319,24 @@ async function addIndexedDbHistoryItem(item: GeneratedImageHistoryItem) {
   return nextHistory.slice(0, generationConfig.maxHistoryCount);
 }
 
+async function getIndexedDbDraftState() {
+  const draft = await runDraftTransaction<IndexedDbDraftRecord>(
+    "readonly",
+    (store) => store.get(imageDbConfig.draftId),
+  );
+
+  return normalizeDraftState(draft ?? null);
+}
+
+async function setIndexedDbDraftState(draft: AppDraftState) {
+  await runDraftTransaction("readwrite", (store) => {
+    store.put({
+      id: imageDbConfig.draftId,
+      ...draft,
+    });
+  });
+}
+
 export function getGenerationCount() {
   if (!canUseStorage()) {
     return 0;
@@ -239,5 +373,22 @@ export async function addGeneratedImageHistory(item: GeneratedImageHistoryItem) 
     return await addIndexedDbHistoryItem(item);
   } catch {
     return setLocalStorageHistory(sortHistory([item, ...getLocalStorageHistory()]));
+  }
+}
+
+export async function getAppDraftState() {
+  try {
+    return (await getIndexedDbDraftState()) ?? getLocalStorageDraftState();
+  } catch {
+    return getLocalStorageDraftState();
+  }
+}
+
+export async function saveAppDraftState(draft: AppDraftState) {
+  try {
+    await setIndexedDbDraftState(draft);
+    clearLocalStorageDraftState();
+  } catch {
+    setLocalStorageDraftState(draft);
   }
 }

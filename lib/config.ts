@@ -6,8 +6,8 @@ export const generationConfig = {
   maxInputImageCount: 16,
   acceptedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
   storageKeys: {
-    access: "general_ai_image_access",
     count: "general_ai_image_generation_count",
+    draft: "general_ai_image_draft",
     history: "general_ai_image_history",
     theme: "general_ai_image_theme",
   },
@@ -17,3 +17,13 @@ export const uploadConfig = {
   acceptAttribute: generationConfig.acceptedMimeTypes.join(","),
   maxFileSizeLabel: "5MB",
 } as const;
+
+export const imageSizeOptions = [
+  { label: "정사각형", value: "1024x1024" },
+  { label: "가로형", value: "1536x1024" },
+  { label: "세로형", value: "1024x1536" },
+] as const;
+
+export type ImageSize = (typeof imageSizeOptions)[number]["value"];
+
+export const defaultImageSize = imageSizeOptions[0].value;
