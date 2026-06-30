@@ -26,6 +26,12 @@ export type AppDraftState = {
   generatedImageUrl: string;
 };
 
+export type GenerationUsage = {
+  date: string;
+  count: number;
+  extraCount: number;
+};
+
 function canUseStorage() {
   return typeof window !== "undefined" && Boolean(window.localStorage);
 }
@@ -170,6 +176,63 @@ function sortHistory(history: GeneratedImageHistoryItem[]) {
     (left, right) =>
       new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
   );
+}
+
+function getTodayKey() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeGenerationUsage(value: unknown): GenerationUsage {
+  const today = getTodayKey();
+
+  if (typeof value === "number") {
+    return {
+      date: today,
+      count: Number.isFinite(value) ? Math.max(Math.floor(value), 0) : 0,
+      extraCount: 0,
+    };
+  }
+
+  if (!value || typeof value !== "object") {
+    return {
+      date: today,
+      count: 0,
+      extraCount: 0,
+    };
+  }
+
+  const usage = value as Partial<GenerationUsage>;
+
+  if (usage.date !== today) {
+    return {
+      date: today,
+      count: 0,
+      extraCount: 0,
+    };
+  }
+
+  const count =
+    typeof usage.count === "number" && Number.isFinite(usage.count)
+      ? Math.max(Math.floor(usage.count), 0)
+      : 0;
+  const extraCount =
+    typeof usage.extraCount === "number" && Number.isFinite(usage.extraCount)
+      ? Math.min(
+          Math.max(Math.floor(usage.extraCount), 0),
+          generationConfig.maxExtraCount,
+        )
+      : 0;
+
+  return {
+    date: today,
+    count,
+    extraCount,
+  };
 }
 
 function getLocalStorageHistory(): GeneratedImageHistoryItem[] {
@@ -345,22 +408,46 @@ async function setIndexedDbDraftState(draft: AppDraftState) {
 }
 
 export function getGenerationCount() {
+  return getGenerationUsage().count;
+}
+
+export function getGenerationUsage() {
+  const fallbackUsage = normalizeGenerationUsage(null);
+
   if (!canUseStorage()) {
-    return 0;
+    return fallbackUsage;
   }
 
-  const savedCount = window.localStorage.getItem(generationConfig.storageKeys.count);
-  const parsedCount = Number(savedCount);
+  const savedUsage = window.localStorage.getItem(generationConfig.storageKeys.count);
 
-  return Number.isFinite(parsedCount) ? parsedCount : 0;
+  if (!savedUsage) {
+    return fallbackUsage;
+  }
+
+  try {
+    return normalizeGenerationUsage(JSON.parse(savedUsage));
+  } catch {
+    return normalizeGenerationUsage(Number(savedUsage));
+  }
 }
 
 export function setGenerationCount(count: number) {
+  const currentUsage = getGenerationUsage();
+  setGenerationUsage({
+    ...currentUsage,
+    count,
+  });
+}
+
+export function setGenerationUsage(usage: GenerationUsage) {
   if (!canUseStorage()) {
     return;
   }
 
-  window.localStorage.setItem(generationConfig.storageKeys.count, String(count));
+  window.localStorage.setItem(
+    generationConfig.storageKeys.count,
+    JSON.stringify(normalizeGenerationUsage(usage)),
+  );
 }
 
 export async function getGeneratedImageHistory() {

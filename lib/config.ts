@@ -1,5 +1,7 @@
 export const generationConfig = {
   maxCount: 5,
+  maxExtraCount: 3,
+  extraRequestPassword: "1234",
   maxHistoryCount: 5,
   maxFileSizeBytes: 5 * 1024 * 1024,
   maxReferenceFileSizeBytes: 512 * 1024,

@@ -22,7 +22,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { appCopy } from "@/lib/appContent";
 import {
@@ -37,11 +37,12 @@ import {
   addGeneratedImageHistory,
   getAppDraftState,
   getGeneratedImageHistory,
-  getGenerationCount,
+  getGenerationUsage,
   saveAppDraftState,
-  setGenerationCount,
+  setGenerationUsage,
   type AppDraftState,
   type GeneratedImageHistoryItem,
+  type GenerationUsage,
 } from "@/lib/localStorage";
 import { StylePreset, styleCategories, stylePresets } from "@/lib/stylePresets";
 import { cn } from "@/lib/utils";
@@ -164,7 +165,11 @@ export function ImageGenerationApp() {
   const [productDetailDescription, setProductDetailDescription] = useState("");
   const [selectedImageSize, setSelectedImageSize] = useState<ImageSize>(defaultImageSize);
   const [selectedStyleId, setSelectedStyleId] = useState(stylePresets[0]?.id ?? "");
-  const [generationCount, setGenerationCountState] = useState(0);
+  const [generationUsage, setGenerationUsageState] = useState<GenerationUsage>({
+    date: "",
+    count: 0,
+    extraCount: 0,
+  });
   const [history, setHistory] = useState<GeneratedImageHistoryItem[]>([]);
   const [generatedImageUrl, setGeneratedImageUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -176,8 +181,9 @@ export function ImageGenerationApp() {
     () => stylePresets.find((style) => style.id === selectedStyleId),
     [selectedStyleId],
   );
-  const remainingCount = Math.max(generationConfig.maxCount - generationCount, 0);
-  const hasReachedLimit = generationCount >= generationConfig.maxCount;
+  const totalGenerationLimit = generationConfig.maxCount + generationUsage.extraCount;
+  const remainingCount = Math.max(totalGenerationLimit - generationUsage.count, 0);
+  const hasReachedLimit = generationUsage.count >= totalGenerationLimit;
   const canOpenStyleStep = Boolean(studentDescription.trim());
   const hasRequiredProductName = !selectedStyle?.requiresProductName || Boolean(productName.trim());
   const hasRequiredProductDetail =
@@ -190,13 +196,19 @@ export function ImageGenerationApp() {
     document.documentElement.classList.remove("dark");
     window.localStorage.setItem(generationConfig.storageKeys.theme, "light");
 
+    const syncGenerationUsage = () => {
+      const savedUsage = getGenerationUsage();
+      setGenerationUsage(savedUsage);
+      setGenerationUsageState(savedUsage);
+    };
+
     const syncPageFromHash = () => {
       setPage(getPageFromHash());
     };
 
     const frameId = window.requestAnimationFrame(() => {
       syncPageFromHash();
-      setGenerationCountState(getGenerationCount());
+      syncGenerationUsage();
       void getGeneratedImageHistory().then(setHistory);
       void getAppDraftState().then((draft) => {
         if (!draft) {
@@ -221,10 +233,13 @@ export function ImageGenerationApp() {
       });
     });
 
+    const usageIntervalId = window.setInterval(syncGenerationUsage, 60_000);
+
     window.addEventListener("hashchange", syncPageFromHash);
 
     return () => {
       window.cancelAnimationFrame(frameId);
+      window.clearInterval(usageIntervalId);
       window.removeEventListener("hashchange", syncPageFromHash);
     };
   }, []);
@@ -403,7 +418,10 @@ export function ImageGenerationApp() {
       }
 
       const imageUrl = getBase64ImageUrl(result.imageBase64, result.mimeType);
-      const nextCount = generationCount + 1;
+      const nextUsage = {
+        ...generationUsage,
+        count: generationUsage.count + 1,
+      };
       const historyItem = {
         id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
@@ -412,8 +430,8 @@ export function ImageGenerationApp() {
         imageUrl,
       };
 
-      setGenerationCount(nextCount);
-      setGenerationCountState(nextCount);
+      setGenerationUsage(nextUsage);
+      setGenerationUsageState(nextUsage);
       setHistory(await addGeneratedImageHistory(historyItem));
       setGeneratedImageUrl(imageUrl);
       setStatusMessage("완성 이미지가 보관함에 저장되었어요.");
@@ -427,6 +445,38 @@ export function ImageGenerationApp() {
     }
   }
 
+  function handleRequestExtraCount(password: string) {
+    if (password !== generationConfig.extraRequestPassword) {
+      return {
+        success: false,
+        message: "암호가 맞지 않습니다.",
+      };
+    }
+
+    const remainingExtraCount =
+      generationConfig.maxExtraCount - generationUsage.extraCount;
+
+    if (remainingExtraCount <= 0) {
+      return {
+        success: false,
+        message: "오늘 받을 수 있는 추가 횟수를 모두 받았습니다.",
+      };
+    }
+
+    const nextUsage = {
+      ...generationUsage,
+      extraCount: generationUsage.extraCount + remainingExtraCount,
+    };
+
+    setGenerationUsage(nextUsage);
+    setGenerationUsageState(nextUsage);
+
+    return {
+      success: true,
+      message: `추가 횟수 ${remainingExtraCount}회가 추가되었습니다.`,
+    };
+  }
+
   return (
     <main className="studio-shell min-h-screen p-3 sm:p-4">
       <div className="mx-auto grid h-[calc(100dvh-1.5rem)] min-h-[680px] w-full max-w-[1540px] overflow-hidden rounded-xl border border-[var(--studio-line)] bg-[#fffdfa]/82 shadow-[var(--studio-shadow-md)] sm:h-[calc(100dvh-2rem)] lg:grid-cols-[132px_minmax(0,1fr)]">
@@ -436,6 +486,7 @@ export function ImageGenerationApp() {
             currentPage={page}
             onGuideOpen={() => setIsGuideOpen(true)}
             remainingCount={remainingCount}
+            totalGenerationLimit={totalGenerationLimit}
           />
 
           <div className="min-w-0 p-4 sm:p-6 lg:p-8">
@@ -507,9 +558,11 @@ export function ImageGenerationApp() {
                     isGenerating={isGenerating}
                     onBack={() => goToPage("step-2")}
                     onGenerate={handleGenerate}
+                    onRequestExtraCount={handleRequestExtraCount}
                     remainingCount={remainingCount}
                     selectedStyle={selectedStyle}
                     statusMessage={statusMessage}
+                    totalGenerationLimit={totalGenerationLimit}
                   />
                 )}
 
@@ -624,10 +677,12 @@ function AppHeader({
   currentPage,
   onGuideOpen,
   remainingCount,
+  totalGenerationLimit,
 }: {
   currentPage: AppPage;
   onGuideOpen: () => void;
   remainingCount: number;
+  totalGenerationLimit: number;
 }) {
   const activeNavId = getActiveNavId(currentPage);
   const title =
@@ -663,7 +718,7 @@ function AppHeader({
       </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="studio-chip rounded-md px-3 py-2 text-sm font-bold">
-            남은 횟수 {remainingCount}/5
+            남은 횟수 {remainingCount}/{totalGenerationLimit}
           </span>
           <button
             className="studio-button-secondary inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm font-bold transition-colors"
@@ -1377,9 +1432,11 @@ function StepThreePage({
   isGenerating,
   onBack,
   onGenerate,
+  onRequestExtraCount,
   remainingCount,
   selectedStyle,
   statusMessage,
+  totalGenerationLimit,
 }: {
   errorMessage: string;
   generatedImageUrl: string;
@@ -1387,10 +1444,45 @@ function StepThreePage({
   isGenerating: boolean;
   onBack: () => void;
   onGenerate: () => void;
+  onRequestExtraCount: (password: string) => {
+    success: boolean;
+    message: string;
+  };
   remainingCount: number;
   selectedStyle?: StylePreset;
   statusMessage: string;
+  totalGenerationLimit: number;
 }) {
+  const [isExtraRequestOpen, setIsExtraRequestOpen] = useState(false);
+  const [extraPassword, setExtraPassword] = useState("");
+  const [extraRequestError, setExtraRequestError] = useState("");
+  const [extraRequestMessage, setExtraRequestMessage] = useState("");
+  const hasMaxExtraCount =
+    totalGenerationLimit >= generationConfig.maxCount + generationConfig.maxExtraCount;
+
+  function handleExtraSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!extraPassword.trim()) {
+      setExtraRequestError("암호를 입력해 주세요.");
+      setExtraRequestMessage("");
+      return;
+    }
+
+    const result = onRequestExtraCount(extraPassword.trim());
+
+    if (result.success) {
+      setExtraRequestMessage(result.message);
+      setExtraRequestError("");
+      setExtraPassword("");
+      setIsExtraRequestOpen(false);
+      return;
+    }
+
+    setExtraRequestError(result.message);
+    setExtraRequestMessage("");
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
       <Panel title="결과" subtitle="완성 이미지를 확인하고 저장하세요.">
@@ -1448,7 +1540,7 @@ function StepThreePage({
           <p className="text-sm font-bold text-[var(--studio-clay)]">선택한 레퍼런스</p>
           <p className="text-pretty text-xl font-extrabold">{selectedStyle?.name}</p>
           <p className="rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/72 px-3 py-2 text-sm font-bold text-[var(--studio-subtle)]">
-            남은 횟수 {remainingCount}/5
+            남은 횟수 {remainingCount}/{totalGenerationLimit}
           </p>
           <PrimaryButton className="sm:w-full" disabled={isGenerating || hasReachedLimit} onClick={onGenerate}>
             {isGenerating ? (
@@ -1458,6 +1550,55 @@ function StepThreePage({
             )}
             AI 이미지 생성
           </PrimaryButton>
+          <SecondaryButton
+            className="sm:w-full"
+            disabled={hasMaxExtraCount}
+            onClick={() => {
+              setIsExtraRequestOpen((isOpen) => !isOpen);
+              setExtraRequestError("");
+              setExtraRequestMessage("");
+            }}
+          >
+            <Lock className="size-5" />
+            {hasMaxExtraCount ? "오늘 추가 완료" : "추가 횟수 요청"}
+          </SecondaryButton>
+          {isExtraRequestOpen && (
+            <form className="space-y-2" onSubmit={handleExtraSubmit}>
+              <label className="block text-sm font-bold text-[var(--studio-subtle)]" htmlFor="extra-count-password">
+                암호
+              </label>
+              <div className="flex gap-2">
+                <input
+                  autoComplete="off"
+                  className="studio-focus h-11 min-w-0 flex-1 rounded-md border border-[var(--studio-line)] bg-[#fffdfa] px-3 text-sm font-bold text-[var(--studio-ink)]"
+                  id="extra-count-password"
+                  onChange={(event) => {
+                    setExtraPassword(event.target.value);
+                    setExtraRequestError("");
+                  }}
+                  type="password"
+                  value={extraPassword}
+                />
+                <button
+                  className="studio-button-primary inline-flex h-11 shrink-0 items-center justify-center rounded-md px-4 text-sm font-extrabold transition-colors"
+                  type="submit"
+                >
+                  확인
+                </button>
+              </div>
+            </form>
+          )}
+          {extraRequestMessage && (
+            <div className="flex items-center gap-2 rounded-lg border border-[rgb(86_127_132_/_0.34)] bg-[rgb(86_127_132_/_0.10)] p-3 text-sm font-bold text-[var(--studio-teal)]">
+              <CheckCircle2 className="size-5" />
+              {extraRequestMessage}
+            </div>
+          )}
+          {extraRequestError && (
+            <div className="rounded-lg border border-[rgb(180_92_106_/_0.38)] bg-[rgb(180_92_106_/_0.10)] p-3 text-sm font-bold text-[var(--destructive)]">
+              {extraRequestError}
+            </div>
+          )}
           <SecondaryButton className="sm:w-full" disabled={!generatedImageUrl} onClick={() => saveImage(generatedImageUrl)}>
             <Download className="size-5" />
             다운로드
