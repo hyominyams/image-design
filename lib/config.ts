@@ -3,6 +3,7 @@ export const generationConfig = {
   maxExtraCount: 3,
   extraRequestPassword: "1234",
   maxHistoryCount: 5,
+  maxUploadImageCount: 3,
   maxFileSizeBytes: 5 * 1024 * 1024,
   maxReferenceFileSizeBytes: 512 * 1024,
   maxInputImageCount: 16,
@@ -21,10 +22,10 @@ export const uploadConfig = {
 } as const;
 
 export const imageSizeOptions = [
-  { label: "정사각형", value: "1024x1024" },
-  { label: "16:9 가로형", value: "1536x864" },
-  { label: "가로형", value: "1536x1024" },
-  { label: "세로형", value: "1024x1536" },
+  { label: "1:1", value: "1024x1024" },
+  { label: "16:9", value: "1536x864" },
+  { label: "4:3", value: "1536x1152" },
+  { label: "3:4", value: "1152x1536" },
 ] as const;
 
 export type ImageSize = (typeof imageSizeOptions)[number]["value"];

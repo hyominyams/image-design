@@ -14,6 +14,7 @@ type GenerateImageRequest = {
   productDetailDescription?: string;
   productName?: string;
   uploadedImageBase64?: string;
+  uploadedImageBase64s?: string[];
   imageSize?: string;
   prompt?: string;
   studentDescription?: string;
@@ -173,18 +174,31 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json()) as GenerateImageRequest;
-  const uploadedImage = body.uploadedImageBase64
-    ? parseDataUrl(body.uploadedImageBase64)
-    : null;
+  const uploadedImageDataUrls =
+    body.uploadedImageBase64s?.slice(0, generationConfig.maxUploadImageCount) ??
+    (body.uploadedImageBase64 ? [body.uploadedImageBase64] : []);
+  const uploadedImages = uploadedImageDataUrls
+    .map((dataUrl) => parseDataUrl(dataUrl))
+    .filter((image): image is NonNullable<ReturnType<typeof parseDataUrl>> =>
+      Boolean(image),
+    );
   const prompt = (body.prompt ?? body.studentDescription)?.trim() ?? "";
   const selectedStyle = getStylePreset(body.styleId ?? "none");
   const productName = body.productName?.trim() ?? "";
   const productDetailDescription = body.productDetailDescription?.trim() ?? "";
   const imageSize = selectedStyle?.forcedImageSize ?? getImageSize(body.imageSize);
 
+  if (uploadedImages.length !== uploadedImageDataUrls.length) {
+    return NextResponse.json(
+      { success: false, error: "Unsupported image data." },
+      { status: 400 },
+    );
+  }
+
   if (
-    uploadedImage &&
-    !generationConfig.acceptedMimeTypes.includes(uploadedImage.mimeType as never)
+    uploadedImages.some(
+      (image) => !generationConfig.acceptedMimeTypes.includes(image.mimeType as never),
+    )
   ) {
     return NextResponse.json(
       { success: false, error: "Unsupported image type." },
@@ -220,11 +234,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const imageBuffer = uploadedImage
-    ? Buffer.from(uploadedImage.base64, "base64")
-    : null;
+  const imageBuffers = uploadedImages.map((image) =>
+    Buffer.from(image.base64, "base64"),
+  );
 
-  if (imageBuffer && imageBuffer.byteLength > generationConfig.maxFileSizeBytes) {
+  if (
+    imageBuffers.some(
+      (imageBuffer) => imageBuffer.byteLength > generationConfig.maxFileSizeBytes,
+    )
+  ) {
     return NextResponse.json(
       { success: false, error: "Image file is too large." },
       { status: 400 },
@@ -237,19 +255,20 @@ export async function POST(request: NextRequest) {
   });
 
   try {
-    const imageFile =
-      imageBuffer && uploadedImage
-        ? await toFile(
-            imageBuffer,
-            `user-upload.${getImageExtension(uploadedImage.mimeType)}`,
-            { type: uploadedImage.mimeType },
-          )
-        : null;
+    const imageFiles = await Promise.all(
+      imageBuffers.map((imageBuffer, index) =>
+        toFile(
+          imageBuffer,
+          `user-upload-${index + 1}.${getImageExtension(uploadedImages[index].mimeType)}`,
+          { type: uploadedImages[index].mimeType },
+        ),
+      ),
+    );
     const styleReferenceFiles = await getStyleReferenceFiles(
       selectedStyle.referenceImages,
     );
     const imageInputs = [
-      ...(imageFile ? [imageFile] : []),
+      ...imageFiles,
       ...styleReferenceFiles,
     ];
 
@@ -261,7 +280,7 @@ export async function POST(request: NextRequest) {
     }
 
     const imagePrompt = buildImagePrompt(selectedStyle, prompt, {
-      hasUploadedImage: Boolean(imageFile),
+      hasUploadedImage: imageFiles.length > 0,
       hasReferenceImages: selectedStyle.referenceImages.length > 0,
       productDetailDescription,
       productName,

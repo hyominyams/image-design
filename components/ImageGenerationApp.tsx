@@ -2,11 +2,9 @@
 
 import Image from "next/image";
 import {
-  ArrowLeft,
   ArrowRight,
   CheckCircle2,
   Download,
-  FileImage,
   GalleryHorizontal,
   HelpCircle,
   Home,
@@ -14,9 +12,7 @@ import {
   Loader2,
   Lock,
   Palette,
-  RotateCcw,
   Settings,
-  RefreshCw,
   Sparkles,
   Upload,
   User,
@@ -159,7 +155,7 @@ export function ImageGenerationApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hasLoadedDraftRef = useRef(false);
   const [page, setPage] = useState<AppPage>("home");
-  const [uploadedImage, setUploadedImage] = useState<UploadedImage | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [studentDescription, setStudentDescription] = useState("");
   const [productName, setProductName] = useState("");
   const [productDetailDescription, setProductDetailDescription] = useState("");
@@ -222,7 +218,7 @@ export function ImageGenerationApp() {
             ? draft.selectedStyleId
             : stylePresets[0]?.id || "";
 
-        setUploadedImage(draft.uploadedImage);
+        setUploadedImages(draft.uploadedImages);
         setStudentDescription(draft.studentDescription);
         setProductName(draft.productName);
         setProductDetailDescription(draft.productDetailDescription);
@@ -250,7 +246,7 @@ export function ImageGenerationApp() {
     }
 
     const draft: AppDraftState = {
-      uploadedImage,
+      uploadedImages,
       studentDescription,
       productName,
       productDetailDescription,
@@ -272,7 +268,7 @@ export function ImageGenerationApp() {
     selectedImageSize,
     selectedStyleId,
     studentDescription,
-    uploadedImage,
+    uploadedImages,
   ]);
 
   function goToPage(nextPage: AppPage) {
@@ -287,27 +283,50 @@ export function ImageGenerationApp() {
   }
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
 
-    if (!file) {
+    if (files.length === 0) {
       return;
     }
 
     setErrorMessage("");
     setStatusMessage("");
 
-    if (!generationConfig.acceptedMimeTypes.includes(file.type as never)) {
+    if (uploadedImages.length + files.length > generationConfig.maxUploadImageCount) {
+      setErrorMessage(`이미지는 최대 ${generationConfig.maxUploadImageCount}장까지 추가할 수 있습니다.`);
+      event.target.value = "";
+      return;
+    }
+
+    if (files.some((file) => !generationConfig.acceptedMimeTypes.includes(file.type as never))) {
       setErrorMessage(appCopy.errors.invalidFileType);
+      event.target.value = "";
       return;
     }
 
-    if (file.size > generationConfig.maxFileSizeBytes) {
+    if (files.some((file) => file.size > generationConfig.maxFileSizeBytes)) {
       setErrorMessage(appCopy.errors.fileTooLarge);
+      event.target.value = "";
       return;
     }
 
-    const dataUrl = await readImageFile(file);
-    setUploadedImage({ dataUrl, name: file.name });
+    const nextImages = await Promise.all(
+      files.map(async (file) => ({
+        dataUrl: await readImageFile(file),
+        name: file.name,
+      })),
+    );
+    setUploadedImages((currentImages) =>
+      [...currentImages, ...nextImages].slice(0, generationConfig.maxUploadImageCount),
+    );
+    event.target.value = "";
+  }
+
+  function handleRemoveUploadedImage(index: number) {
+    setUploadedImages((currentImages) =>
+      currentImages.filter((_, imageIndex) => imageIndex !== index),
+    );
+    setErrorMessage("");
   }
 
   function validateStepOne() {
@@ -347,17 +366,6 @@ export function ImageGenerationApp() {
     return "";
   }
 
-  function goToStyleStep() {
-    const validationError = validateStepOne();
-
-    if (validationError) {
-      setErrorMessage(validationError);
-      return;
-    }
-
-    goToPage("step-2");
-  }
-
   function handleSelectStyle(styleId: string) {
     const nextStyle = stylePresets.find((style) => style.id === styleId);
 
@@ -367,17 +375,6 @@ export function ImageGenerationApp() {
     if (nextStyle?.forcedImageSize) {
       setSelectedImageSize(nextStyle.forcedImageSize);
     }
-  }
-
-  function goToGenerateStep() {
-    const validationError = validateGenerate();
-
-    if (validationError) {
-      setErrorMessage(validationError);
-      return;
-    }
-
-    goToPage("step-3");
   }
 
   async function handleGenerate() {
@@ -402,7 +399,7 @@ export function ImageGenerationApp() {
         body: JSON.stringify({
           productDetailDescription: productDetailDescription.trim(),
           productName: productName.trim(),
-          uploadedImageBase64: uploadedImage?.dataUrl,
+          uploadedImageBase64s: uploadedImages.map((image) => image.dataUrl),
           imageSize: selectedStyle.forcedImageSize ?? selectedImageSize,
           prompt: studentDescription.trim(),
           styleId: selectedStyle.id,
@@ -499,81 +496,53 @@ export function ImageGenerationApp() {
               />
             )}
 
-            {page !== "home" && (
-              <StepShell
+            {page !== "home" && page !== "step-4" && (
+              <CreateWorkspace
                 canOpenGenerateStep={canOpenGenerateStep}
                 canOpenStyleStep={canOpenStyleStep}
-                currentPage={page}
-                onStepClick={goToPage}
-              >
-                {page === "step-1" && (
-                  <StepOnePage
-                    errorMessage={errorMessage}
-                    fileInputRef={fileInputRef}
-                    onClearImage={() => {
-                      setUploadedImage(null);
-                      setErrorMessage("");
-                      if (fileInputRef.current) {
-                        fileInputRef.current.value = "";
-                      }
-                    }}
-                    onFileChange={handleFileChange}
-                    onGuideOpen={() => setIsGuideOpen(true)}
-                    onNext={goToStyleStep}
-                    forcedImageSize={selectedStyle?.forcedImageSize}
-                    selectedImageSize={selectedImageSize}
-                    setSelectedImageSize={setSelectedImageSize}
-                    setStudentDescription={setStudentDescription}
-                    studentDescription={studentDescription}
-                    uploadedImage={uploadedImage}
-                  />
-                )}
+                errorMessage={errorMessage}
+                fileInputRef={fileInputRef}
+                generatedImageUrl={generatedImageUrl}
+                hasReachedLimit={hasReachedLimit}
+                isGenerating={isGenerating}
+                onFileChange={handleFileChange}
+                onGenerate={handleGenerate}
+                onGuideOpen={() => setIsGuideOpen(true)}
+                onRemoveUploadedImage={handleRemoveUploadedImage}
+                onRequestExtraCount={handleRequestExtraCount}
+                onSelectStyle={handleSelectStyle}
+                productDetailDescription={productDetailDescription}
+                productName={productName}
+                remainingCount={remainingCount}
+                selectedImageSize={selectedImageSize}
+                selectedStyle={selectedStyle}
+                selectedStyleId={selectedStyleId}
+                setProductDetailDescription={(description) => {
+                  setProductDetailDescription(description);
+                  setErrorMessage("");
+                }}
+                setProductName={(name) => {
+                  setProductName(name);
+                  setErrorMessage("");
+                }}
+                setSelectedImageSize={setSelectedImageSize}
+                setStudentDescription={(description) => {
+                  setStudentDescription(description);
+                  setErrorMessage("");
+                }}
+                statusMessage={statusMessage}
+                studentDescription={studentDescription}
+                totalGenerationLimit={totalGenerationLimit}
+                uploadedImages={uploadedImages}
+              />
+            )}
 
-                {page === "step-2" && (
-                  <StepTwoPage
-                    onBack={() => goToPage("step-1")}
-                    onNext={goToGenerateStep}
-                    onSelect={handleSelectStyle}
-                    errorMessage={errorMessage}
-                    productDetailDescription={productDetailDescription}
-                    productName={productName}
-                    selectedStyle={selectedStyle}
-                    selectedStyleId={selectedStyleId}
-                    setProductDetailDescription={(description) => {
-                      setProductDetailDescription(description);
-                      setErrorMessage("");
-                    }}
-                    setProductName={(name) => {
-                      setProductName(name);
-                      setErrorMessage("");
-                    }}
-                  />
-                )}
-
-                {page === "step-3" && (
-                  <StepThreePage
-                    errorMessage={errorMessage}
-                    generatedImageUrl={generatedImageUrl}
-                    hasReachedLimit={hasReachedLimit}
-                    isGenerating={isGenerating}
-                    onBack={() => goToPage("step-2")}
-                    onGenerate={handleGenerate}
-                    onRequestExtraCount={handleRequestExtraCount}
-                    remainingCount={remainingCount}
-                    selectedStyle={selectedStyle}
-                    statusMessage={statusMessage}
-                    totalGenerationLimit={totalGenerationLimit}
-                  />
-                )}
-
-                {page === "step-4" && (
-                  <StepFourPage
-                    generatedImageUrl={generatedImageUrl}
-                    history={history}
-                    onSelectSaved={setGeneratedImageUrl}
-                  />
-                )}
-              </StepShell>
+            {page === "step-4" && (
+              <StepFourPage
+                generatedImageUrl={generatedImageUrl}
+                history={history}
+                onSelectSaved={setGeneratedImageUrl}
+              />
             )}
           </div>
         </section>
@@ -686,25 +655,17 @@ function AppHeader({
 }) {
   const activeNavId = getActiveNavId(currentPage);
   const title =
-    currentPage === "step-1"
-      ? "1. Upload & Prompt"
-      : currentPage === "step-2"
-        ? "2. AI Reference"
-        : currentPage === "step-3"
-          ? "3. Generating"
-          : currentPage === "step-4"
-            ? "4. Gallery"
-            : "Showroom AI";
+    currentPage === "step-4"
+      ? "Gallery"
+      : currentPage === "home"
+        ? "Showroom AI"
+        : "AI 이미지 만들기";
   const subtitle =
-    currentPage === "step-1"
-      ? "사진을 업로드하고 원하는 공간을 설명해 주세요."
-      : currentPage === "step-2"
-        ? "원하는 스타일을 선택해 AI가 공간감을 반영합니다."
-        : currentPage === "step-3"
-          ? "AI가 이미지를 생성하는 동안 결과를 확인하세요."
-          : currentPage === "step-4"
-            ? "생성된 이미지를 보관하고 다시 확인하세요."
-            : "프롬프트와 레퍼런스로 이미지를 만드세요.";
+    currentPage === "step-4"
+      ? "생성된 이미지를 보관하고 다시 확인하세요."
+      : currentPage === "home"
+        ? "프롬프트와 레퍼런스로 이미지를 만드세요."
+        : "이미지, 프롬프트, 레퍼런스를 한 화면에서 선택하세요.";
 
   return (
     <header className="flex flex-col gap-4 border-b border-[var(--studio-line)] bg-[#fffdfa]/72 px-4 py-4 sm:px-6 lg:flex-row lg:items-start lg:justify-between lg:px-8 lg:py-6">
@@ -909,556 +870,75 @@ function HomePage({
   );
 }
 
-function StepShell({
+function CreateWorkspace({
   canOpenGenerateStep,
   canOpenStyleStep,
-  children,
-  currentPage,
-  onStepClick,
-}: {
-  canOpenGenerateStep: boolean;
-  canOpenStyleStep: boolean;
-  children: React.ReactNode;
-  currentPage: AppPage;
-  onStepClick: (page: AppPage) => void;
-}) {
-  const isStepAvailable = (stepPage: AppPage) => {
-    if (stepPage === currentPage) {
-      return true;
-    }
-
-    if (stepPage === "step-4") {
-      return true;
-    }
-
-    if (stepPage === "step-1") {
-      return true;
-    }
-
-    if (stepPage === "step-2") {
-      return canOpenStyleStep;
-    }
-
-    if (stepPage === "step-3") {
-      return canOpenGenerateStep;
-    }
-
-    return false;
-  };
-
-  return (
-    <section className="space-y-4">
-      <div className="studio-toolbar sticky top-0 z-20 grid gap-2 rounded-xl p-2 sm:grid-cols-2 xl:grid-cols-4">
-        {steps.map((step, index) => {
-          const Icon = step.icon;
-          const available = isStepAvailable(step.page);
-
-          return (
-            <button
-              className={cn(
-                "flex h-[76px] items-center gap-3 rounded-md px-3 py-2 text-left transition-colors",
-                currentPage === step.page
-                  ? "bg-[var(--studio-ink)] text-[#fffaf3]"
-                  : "bg-transparent text-[var(--studio-subtle)] hover:bg-[#fffdfa]/72",
-                !available && "cursor-not-allowed opacity-45 hover:bg-[var(--studio-panel-soft)]",
-              )}
-              key={step.page}
-              onClick={() => available && onStepClick(step.page)}
-              disabled={!available}
-              type="button"
-            >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/64">
-                {available ? <Icon className="size-5" /> : <Lock className="size-5" />}
-              </span>
-              <span className="grid min-h-[52px] content-center">
-                <span className="block text-xs font-extrabold">STEP {index + 1}</span>
-                <span className="block text-sm font-extrabold">{step.label}</span>
-                <span
-                  className={cn(
-                    "mt-0.5 block h-[14px] text-[11px] font-extrabold leading-[14px]",
-                    available && "invisible",
-                  )}
-                >
-                  이전 단계 필요
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function StepOnePage({
   errorMessage,
   fileInputRef,
-  forcedImageSize,
-  onClearImage,
+  generatedImageUrl,
+  hasReachedLimit,
+  isGenerating,
   onFileChange,
+  onGenerate,
   onGuideOpen,
-  onNext,
-  selectedImageSize,
-  setSelectedImageSize,
-  setStudentDescription,
-  studentDescription,
-  uploadedImage,
-}: {
-  errorMessage: string;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-  forcedImageSize?: ImageSize;
-  onClearImage: () => void;
-  onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onGuideOpen: () => void;
-  onNext: () => void;
-  selectedImageSize: ImageSize;
-  setSelectedImageSize: (imageSize: ImageSize) => void;
-  setStudentDescription: (description: string) => void;
-  studentDescription: string;
-  uploadedImage: UploadedImage | null;
-}) {
-  return (
-    <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-      <Panel title={appCopy.upload.title} subtitle={appCopy.upload.description}>
-        <input
-          accept={uploadConfig.acceptAttribute}
-          className="hidden"
-          onChange={onFileChange}
-          ref={fileInputRef}
-          type="file"
-        />
-        <div className="min-w-0 rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)] p-3">
-          <button
-            className={cn(
-              "group relative flex aspect-[16/11] min-w-0 w-full items-center justify-center overflow-hidden rounded-md border text-left transition-all",
-              uploadedImage
-                ? "border-[rgb(99_116_105_/_0.34)] bg-[#fffdfa] shadow-[0_10px_24px_rgba(34,40,42,0.07)]"
-                : "border-dashed border-[var(--studio-line)] bg-[#fffdfa]/56 hover:border-[var(--studio-teal)]",
-            )}
-            onClick={() => fileInputRef.current?.click()}
-            type="button"
-          >
-            {uploadedImage ? (
-              <>
-                <Image
-                  alt="업로드 이미지 미리보기"
-                  className="h-full w-full object-contain p-4"
-                  height={720}
-                  src={uploadedImage.dataUrl}
-                  unoptimized
-                  width={1040}
-                />
-                <span className="absolute left-3 top-3 rounded-md border border-[rgb(255_253_250_/_0.72)] bg-[#fffdfa]/88 px-3 py-1 text-xs font-bold text-[var(--studio-sage)] shadow-[var(--studio-shadow-xs)] backdrop-blur-sm">
-                  참고 이미지
-                </span>
-                <span className="absolute right-3 top-3 flex items-center gap-1 rounded-md bg-[var(--studio-ink)] px-3 py-1 text-xs font-bold text-[#fffaf3] shadow-[var(--studio-shadow-xs)]">
-                  <CheckCircle2 className="size-3.5" />
-                  사용 중
-                </span>
-                <span className="pointer-events-none absolute inset-3 rounded-md border border-[#fffdfa]/64" />
-              </>
-            ) : (
-                <span className="flex w-full max-w-sm flex-col items-start gap-4 p-5 text-[var(--studio-subtle)]">
-                <span className="flex size-11 items-center justify-center rounded-md bg-[var(--studio-panel)] text-[var(--studio-sage)] shadow-[var(--studio-shadow-xs)]">
-                  <Upload className="size-6" />
-                </span>
-                <span>
-                  <span className="block text-lg font-extrabold text-[var(--studio-ink)]">
-                    {appCopy.upload.empty}
-                  </span>
-                  <span className="mt-2 block text-sm font-semibold leading-6">
-                    jpg, png, webp / 최대 5MB
-                  </span>
-                </span>
-              </span>
-            )}
-          </button>
-
-          <div className="mt-3 grid min-w-0 gap-2">
-            {uploadedImage ? (
-              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-3 overflow-hidden rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/82 px-3 py-2">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--studio-panel-soft)] text-[var(--studio-sage)]">
-                    <FileImage className="size-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-extrabold text-[var(--studio-ink)]">
-                      {uploadedImage.name}
-                    </p>
-                    <p className="text-xs font-semibold text-[var(--studio-subtle)]">
-                      참고 이미지
-                    </p>
-                  </div>
-                </div>
-                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 sm:flex">
-                  <button
-                    className="studio-button-secondary inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-bold transition-colors sm:px-3"
-                    onClick={() => fileInputRef.current?.click()}
-                    type="button"
-                  >
-                    <RefreshCw className="size-4" />
-                    이미지 바꾸기
-                  </button>
-                  <button
-                    className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md border border-[rgb(180_92_106_/_0.28)] bg-[rgb(180_92_106_/_0.08)] px-2 text-sm font-bold text-[var(--destructive)] transition-colors hover:bg-[rgb(180_92_106_/_0.13)] sm:px-3"
-                    aria-label="업로드 이미지 초기화"
-                    onClick={onClearImage}
-                    type="button"
-                  >
-                    <RotateCcw className="size-4" />
-                    초기화
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                className="studio-button-secondary inline-flex h-11 w-full items-center justify-center gap-2 rounded-md px-4 text-sm font-bold transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-                type="button"
-              >
-                <ImagePlus className="size-4" />
-                이미지 고르기
-              </button>
-            )}
-          </div>
-        </div>
-      </Panel>
-
-      <Panel title={appCopy.description.title} subtitle="만들고 싶은 이미지를 적어 주세요.">
-        <textarea
-          className="studio-focus min-h-56 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] p-4 text-base font-semibold leading-7 placeholder:text-[var(--studio-subtle)]"
-          maxLength={500}
-          onChange={(event) => setStudentDescription(event.target.value)}
-          placeholder={appCopy.description.placeholder}
-          value={studentDescription}
-        />
-        <label className="mt-3 grid gap-2 rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/58 p-4 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
-          <span>
-            <span className="block text-sm font-extrabold text-[var(--studio-ink)]">
-              이미지 비율
-            </span>
-            <span className="mt-1 block text-xs font-bold text-[var(--studio-subtle)]">
-              결과 화면 크기
-            </span>
-          </span>
-          <select
-            className="studio-focus h-11 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] px-3 text-sm font-bold text-[var(--studio-ink)]"
-            disabled={Boolean(forcedImageSize)}
-            onChange={(event) => setSelectedImageSize(event.target.value as ImageSize)}
-            value={forcedImageSize ?? selectedImageSize}
-          >
-            {imageSizeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {forcedImageSize && (
-            <span className="sm:col-start-2 text-xs font-bold text-[var(--studio-clay)]">
-              제품 히어로컷은 16:9 가로형으로 생성됩니다
-            </span>
-          )}
-        </label>
-        <div className="mt-3 rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/58 p-4">
-          <p className="mb-3 text-sm font-bold text-[var(--studio-clay)]">프롬프트 예시</p>
-          <div className="grid gap-2 text-sm font-semibold leading-6 text-[var(--studio-subtle)] sm:grid-cols-3">
-            {appCopy.description.exampleParts.map((part) => (
-              <div className="rounded-md border border-[var(--studio-line)] bg-[var(--studio-panel)] p-3" key={part.label}>
-                <p className="font-extrabold text-[var(--studio-ink)]">{part.label}</p>
-                <p className="mt-1 text-pretty">{part.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-bold text-[var(--studio-subtle)]">
-            {studentDescription.length}/500
-          </p>
-          <button
-            className="text-sm font-bold text-[var(--studio-clay)] underline underline-offset-4"
-            onClick={onGuideOpen}
-            type="button"
-          >
-            프롬프트 도움
-          </button>
-        </div>
-        {errorMessage && <AlertMessage>{errorMessage}</AlertMessage>}
-        <div className="mt-5 flex justify-end">
-          <PrimaryButton onClick={onNext}>
-            다음: 레퍼런스 선택 <ArrowRight className="size-5" />
-          </PrimaryButton>
-        </div>
-      </Panel>
-    </div>
-  );
-}
-
-function StepTwoPage({
-  errorMessage,
-  onBack,
-  onNext,
-  onSelect,
+  onRemoveUploadedImage,
+  onRequestExtraCount,
+  onSelectStyle,
   productDetailDescription,
   productName,
+  remainingCount,
+  selectedImageSize,
   selectedStyle,
   selectedStyleId,
   setProductDetailDescription,
   setProductName,
-}: {
-  errorMessage: string;
-  onBack: () => void;
-  onNext: () => void;
-  onSelect: (styleId: string) => void;
-  productDetailDescription: string;
-  productName: string;
-  selectedStyle?: StylePreset;
-  selectedStyleId: string;
-  setProductDetailDescription: (description: string) => void;
-  setProductName: (name: string) => void;
-}) {
-  const [selectedCategory, setSelectedCategory] = useState("전체");
-  const visibleStylePresets = useMemo(
-    () =>
-      selectedCategory === "전체"
-        ? stylePresets
-        : stylePresets.filter((style) => style.category === selectedCategory),
-    [selectedCategory],
-  );
-
-  return (
-    <div className="grid gap-4 pb-28 lg:grid-cols-[minmax(0,1fr)_340px] lg:pb-32">
-      <Panel
-        className="order-1 lg:order-1"
-        title={appCopy.styles.title}
-        subtitle={appCopy.styles.description}
-      >
-        <div className="mb-4 flex gap-2 overflow-x-auto rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/58 p-2">
-          {styleCategories.map((category) => (
-            <button
-              className={cn(
-                "h-9 shrink-0 rounded-md px-3 text-sm font-bold transition-colors",
-                selectedCategory === category
-                  ? "studio-chip-active"
-                  : "border border-[var(--studio-line)] bg-[#fffdfa]/72 text-[var(--studio-subtle)] hover:bg-[#f3eadf]",
-              )}
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              type="button"
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-
-        <div className="mb-3 text-sm font-bold text-[var(--studio-subtle)]">
-          {visibleStylePresets.length}개 레퍼런스
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {visibleStylePresets.map((style) => (
-            <button
-              aria-pressed={style.id === selectedStyleId}
-              className={cn(
-                "studio-thumbnail relative grid h-full min-h-[218px] grid-rows-[auto_1fr] overflow-hidden rounded-md text-left transition-all",
-                style.id === selectedStyleId
-                  ? "border-[var(--studio-clay)] shadow-[0_0_0_2px_rgba(169,101,72,0.16),0_10px_22px_rgba(34,40,42,0.07)]"
-                  : "hover:border-[var(--studio-teal)] hover:shadow-[0_8px_20px_rgba(34,40,42,0.07)]",
-              )}
-              key={style.id}
-              onClick={() => onSelect(style.id)}
-              type="button"
-            >
-              {style.id === selectedStyleId && (
-                <span className="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-md bg-[var(--studio-ink)] text-[#fffaf3] shadow-[var(--studio-shadow-xs)]">
-                  <CheckCircle2 className="size-5" />
-                </span>
-              )}
-              {style.thumbnail ? (
-                <Image
-                  alt={`${style.name} 썸네일`}
-                  className={cn(
-                    "aspect-[4/5] w-full",
-                    style.forcedImageSize
-                      ? "bg-[var(--studio-paper)] object-contain p-2"
-                      : "object-cover",
-                  )}
-                  height={320}
-                  src={style.thumbnail}
-                  width={240}
-                />
-              ) : (
-                <div className="flex aspect-[4/5] w-full items-center justify-center bg-[var(--studio-panel-soft)] text-[var(--studio-subtle)]">
-                  <Palette className="size-12" />
-                </div>
-              )}
-              <div className="flex min-h-22 flex-col p-3">
-                <p className="text-pretty font-extrabold">{style.name}</p>
-                <p className="mt-1 text-pretty text-sm font-semibold leading-5 text-[var(--studio-subtle)]">
-                  {style.description}
-                </p>
-              </div>
-            </button>
-          ))}
-        </div>
-        <div className="mt-5 flex flex-wrap justify-between gap-3">
-          <SecondaryButton onClick={onBack}>
-            <ArrowLeft className="size-5" />
-            이전
-          </SecondaryButton>
-          <PrimaryButton onClick={onNext}>
-            다음: 생성하기 <ArrowRight className="size-5" />
-          </PrimaryButton>
-        </div>
-      </Panel>
-
-      <Panel
-        className="order-2 lg:sticky lg:top-4 lg:order-2 lg:self-start"
-        title="선택한 레퍼런스"
-        subtitle="이 방향을 결과에 반영합니다."
-      >
-        {selectedStyle && (
-          <>
-            {selectedStyle.thumbnail ? (
-              <Image
-                alt={`${selectedStyle.name} 미리보기`}
-                className={cn(
-                  "w-full rounded-lg border border-[var(--studio-line)] object-cover",
-                  selectedStyle.forcedImageSize ? "aspect-video" : "aspect-[4/5]",
-                )}
-                height={520}
-                src={selectedStyle.thumbnail}
-                width={390}
-              />
-            ) : (
-              <div className="flex aspect-[4/5] w-full items-center justify-center rounded-lg border border-[var(--studio-line)] bg-[var(--studio-panel-soft)] text-[var(--studio-subtle)]">
-                <Palette className="size-16" />
-              </div>
-            )}
-            <h2 className="mt-4 text-2xl font-extrabold">{selectedStyle.name}</h2>
-            <p className="mt-2 text-pretty text-base font-semibold leading-7 text-[var(--studio-subtle)]">
-              {selectedStyle.description}
-            </p>
-            {selectedStyle.forcedImageSize && (
-              <p className="mt-3 rounded-md border border-[rgb(86_127_132_/_0.28)] bg-[rgb(86_127_132_/_0.10)] px-3 py-2 text-sm font-extrabold text-[var(--studio-teal)]">
-                16:9 가로형
-              </p>
-            )}
-            {(selectedStyle.requiresProductName || selectedStyle.requiresProductDetail) && (
-              <div className="mt-4 space-y-3 rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/68 p-4">
-                {selectedStyle.requiresProductName && (
-                  <label className="block">
-                    <span className="text-sm font-extrabold text-[var(--studio-ink)]">
-                      제품명
-                    </span>
-                    <input
-                      className="studio-focus mt-2 h-11 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] px-3 text-sm font-bold text-[var(--studio-ink)] placeholder:text-[var(--studio-subtle)]"
-                      maxLength={60}
-                      onChange={(event) => setProductName(event.target.value)}
-                      placeholder="예: 모듈형 스마트 책상 조명"
-                      value={productName}
-                    />
-                  </label>
-                )}
-                {selectedStyle.requiresProductDetail && (
-                  <label className="block">
-                    <span className="text-sm font-extrabold text-[var(--studio-ink)]">
-                      제품 디테일
-                    </span>
-                    <textarea
-                      className="studio-focus mt-2 min-h-28 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] px-3 py-3 text-sm font-bold leading-6 text-[var(--studio-ink)] placeholder:text-[var(--studio-subtle)]"
-                      maxLength={260}
-                      onChange={(event) => setProductDetailDescription(event.target.value)}
-                      placeholder="재료, 기능, 보여주고 싶은 부분을 적어 주세요."
-                      value={productDetailDescription}
-                    />
-                    <span className="mt-2 block text-xs font-bold text-[var(--studio-subtle)]">
-                      {productDetailDescription.length}/260
-                    </span>
-                  </label>
-                )}
-              </div>
-            )}
-            {errorMessage && <AlertMessage>{errorMessage}</AlertMessage>}
-          </>
-        )}
-      </Panel>
-
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--studio-line)] bg-[#fffdfa]/94 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_28px_rgba(34,40,42,0.075)] backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[1376px] items-center gap-3">
-          <SecondaryButton className="hidden shrink-0 sm:inline-flex" onClick={onBack}>
-            <ArrowLeft className="size-5" />
-            이전
-          </SecondaryButton>
-
-          <div className="flex min-w-0 flex-1 items-center gap-3 rounded-md border border-[var(--studio-line)] bg-[#f3eadf]/72 p-2">
-            {selectedStyle?.thumbnail ? (
-              <Image
-                alt=""
-                aria-hidden="true"
-                className="size-12 shrink-0 rounded object-cover"
-                height={48}
-                src={selectedStyle.thumbnail}
-                width={48}
-              />
-            ) : (
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-md bg-[var(--studio-panel)] text-[var(--studio-subtle)]">
-                <Palette className="size-6" />
-              </div>
-            )}
-            <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-[var(--studio-clay)]">
-                {selectedStyle?.category}
-              </p>
-              <p className="truncate text-sm font-extrabold text-[var(--studio-ink)] sm:text-base">
-                {selectedStyle?.name}
-              </p>
-            </div>
-          </div>
-
-          <PrimaryButton className="w-auto shrink-0 px-4 sm:px-6" onClick={onNext}>
-            생성 단계로 <ArrowRight className="size-5" />
-          </PrimaryButton>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StepThreePage({
-  errorMessage,
-  generatedImageUrl,
-  hasReachedLimit,
-  isGenerating,
-  onBack,
-  onGenerate,
-  onRequestExtraCount,
-  remainingCount,
-  selectedStyle,
+  setSelectedImageSize,
+  setStudentDescription,
   statusMessage,
+  studentDescription,
   totalGenerationLimit,
+  uploadedImages,
 }: {
+  canOpenGenerateStep: boolean;
+  canOpenStyleStep: boolean;
   errorMessage: string;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   generatedImageUrl: string;
   hasReachedLimit: boolean;
   isGenerating: boolean;
-  onBack: () => void;
+  onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onGenerate: () => void;
+  onGuideOpen: () => void;
+  onRemoveUploadedImage: (index: number) => void;
   onRequestExtraCount: (password: string) => {
     success: boolean;
     message: string;
   };
+  onSelectStyle: (styleId: string) => void;
+  productDetailDescription: string;
+  productName: string;
   remainingCount: number;
+  selectedImageSize: ImageSize;
   selectedStyle?: StylePreset;
+  selectedStyleId: string;
+  setProductDetailDescription: (description: string) => void;
+  setProductName: (name: string) => void;
+  setSelectedImageSize: (imageSize: ImageSize) => void;
+  setStudentDescription: (description: string) => void;
   statusMessage: string;
+  studentDescription: string;
   totalGenerationLimit: number;
+  uploadedImages: UploadedImage[];
 }) {
+  const [isReferenceLightboxOpen, setIsReferenceLightboxOpen] = useState(false);
   const [isExtraRequestOpen, setIsExtraRequestOpen] = useState(false);
   const [extraPassword, setExtraPassword] = useState("");
   const [extraRequestError, setExtraRequestError] = useState("");
   const [extraRequestMessage, setExtraRequestMessage] = useState("");
+  const selectedImageSizeValue = selectedStyle?.forcedImageSize ?? selectedImageSize;
   const hasMaxExtraCount =
     totalGenerationLimit >= generationConfig.maxCount + generationConfig.maxExtraCount;
+  const uploadSlots = Array.from({ length: generationConfig.maxUploadImageCount });
 
   function handleExtraSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1484,128 +964,559 @@ function StepThreePage({
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <Panel title="결과" subtitle="완성 이미지를 확인하고 저장하세요.">
-        <div
-          className={cn(
-            "relative flex items-center justify-center overflow-hidden rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)]",
-            selectedStyle?.forcedImageSize ? "aspect-video" : "aspect-square",
-          )}
-        >
-            {generatedImageUrl ? (
-              <Image
-                alt="생성된 AI 이미지"
-                className="h-full w-full object-contain p-3"
-                height={720}
-                src={generatedImageUrl}
-                unoptimized
-                width={720}
-              />
-            ) : (
-              <>
+    <>
+      <section className="space-y-4">
+        <div className="studio-toolbar sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-xl p-2">
+          {[
+            { label: "입력", active: true, complete: canOpenStyleStep },
+            { label: "레퍼런스", active: canOpenStyleStep, complete: Boolean(selectedStyle) },
+            { label: "생성", active: canOpenGenerateStep, complete: Boolean(generatedImageUrl) },
+          ].map((item, index) => (
+            <div
+              className={cn(
+                "flex h-11 items-center gap-2 rounded-md border px-3 text-sm font-extrabold",
+                item.active
+                  ? "border-[var(--studio-line-strong)] bg-[#fffdfa] text-[var(--studio-ink)]"
+                  : "border-[var(--studio-line)] bg-[#f3eadf]/52 text-[var(--studio-subtle)]",
+              )}
+              key={item.label}
+            >
+              <span
+                className={cn(
+                  "flex size-6 items-center justify-center rounded-full text-xs",
+                  item.complete
+                    ? "bg-[var(--studio-ink)] text-[#fffaf3]"
+                    : "bg-[var(--studio-panel-soft)] text-[var(--studio-subtle)]",
+                )}
+              >
+                {item.complete ? <CheckCircle2 className="size-4" /> : index + 1}
+              </span>
+              {item.label}
+              {index < 2 && <ArrowRight className="size-4 text-[var(--studio-subtle)]" />}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+          <Panel title="작업 입력" subtitle="이미지, 프롬프트, 레퍼런스를 한 화면에서 선택하세요.">
+            <input
+              accept={uploadConfig.acceptAttribute}
+              className="hidden"
+              multiple
+              onChange={onFileChange}
+              ref={fileInputRef}
+              type="file"
+            />
+
+            <div className="grid gap-5">
+              <section>
+                <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                  <div>
+                    <h3 className="text-base font-extrabold text-[var(--studio-ink)]">
+                      이미지 첨부
+                    </h3>
+                    <p className="mt-1 text-sm font-bold text-[var(--studio-subtle)]">
+                      {uploadedImages.length}/{generationConfig.maxUploadImageCount}
+                    </p>
+                  </div>
+                  <SecondaryButton
+                    className="h-10 px-3 sm:w-auto"
+                    disabled={uploadedImages.length >= generationConfig.maxUploadImageCount}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <ImagePlus className="size-4" />
+                    이미지 추가
+                  </SecondaryButton>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  {uploadSlots.map((_, index) => {
+                    const uploadedImage = uploadedImages[index];
+
+                    return (
+                      <div
+                        className={cn(
+                          "relative flex aspect-[4/3] min-h-36 overflow-hidden rounded-lg border bg-[var(--studio-paper)]",
+                          uploadedImage
+                            ? "border-[var(--studio-line-strong)]"
+                            : "border-dashed border-[var(--studio-line)]",
+                        )}
+                        key={index}
+                      >
+                        {uploadedImage ? (
+                          <>
+                            <Image
+                              alt={`첨부 이미지 ${index + 1}`}
+                              className="h-full w-full object-contain p-2"
+                              height={320}
+                              src={uploadedImage.dataUrl}
+                              unoptimized
+                              width={420}
+                            />
+                            <span className="absolute left-2 top-2 rounded-md bg-[#fffdfa]/90 px-2 py-1 text-xs font-extrabold text-[var(--studio-ink)]">
+                              이미지 {index + 1}
+                            </span>
+                            <button
+                              aria-label={`첨부 이미지 ${index + 1} 삭제`}
+                              className="absolute right-2 top-2 flex size-8 items-center justify-center rounded-md bg-[var(--studio-ink)] text-[#fffaf3]"
+                              onClick={() => onRemoveUploadedImage(index)}
+                              type="button"
+                            >
+                              <X className="size-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="flex h-full w-full flex-col items-center justify-center gap-3 p-4 text-center text-[var(--studio-subtle)] transition-colors hover:bg-[#fffdfa]/64"
+                            onClick={() => fileInputRef.current?.click()}
+                            type="button"
+                          >
+                            <Upload className="size-7" />
+                            <span className="text-sm font-extrabold">
+                              이미지 {index + 1}
+                            </span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="grid gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-base font-extrabold text-[var(--studio-ink)]">
+                    프롬프트
+                  </h3>
+                  <button
+                    className="text-sm font-bold text-[var(--studio-clay)] underline underline-offset-4"
+                    onClick={onGuideOpen}
+                    type="button"
+                  >
+                    프롬프트 도움
+                  </button>
+                </div>
+                <textarea
+                  className="studio-focus min-h-40 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] p-4 text-base font-semibold leading-7 placeholder:text-[var(--studio-subtle)]"
+                  maxLength={500}
+                  onChange={(event) => setStudentDescription(event.target.value)}
+                  placeholder="만들고 싶은 장면을 적어 주세요."
+                  value={studentDescription}
+                />
+                <p className="text-right text-sm font-bold text-[var(--studio-subtle)]">
+                  {studentDescription.length}/500
+                </p>
+              </section>
+
+              <section>
+                <h3 className="mb-3 text-base font-extrabold text-[var(--studio-ink)]">
+                  이미지 비율
+                </h3>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {imageSizeOptions.map((option) => (
+                    <button
+                      aria-pressed={selectedImageSizeValue === option.value}
+                      className={cn(
+                        "h-12 rounded-md border px-3 text-sm font-extrabold transition-colors",
+                        selectedImageSizeValue === option.value
+                          ? "border-[var(--studio-ink)] bg-[var(--studio-ink)] text-[#fffaf3]"
+                          : "border-[var(--studio-line)] bg-[#fffdfa]/72 text-[var(--studio-subtle)] hover:bg-[#f3eadf]",
+                        selectedStyle?.forcedImageSize && selectedStyle.forcedImageSize !== option.value
+                          ? "cursor-not-allowed opacity-45"
+                          : "",
+                      )}
+                      disabled={Boolean(
+                        selectedStyle?.forcedImageSize &&
+                          selectedStyle.forcedImageSize !== option.value,
+                      )}
+                      key={option.value}
+                      onClick={() => setSelectedImageSize(option.value)}
+                      type="button"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                  <div>
+                    <h3 className="text-base font-extrabold text-[var(--studio-ink)]">
+                      레퍼런스
+                    </h3>
+                    <p className="mt-1 text-sm font-bold text-[var(--studio-subtle)]">
+                      1개 선택
+                    </p>
+                  </div>
+                  <SecondaryButton
+                    className="h-10 px-3 sm:w-auto"
+                    onClick={() => setIsReferenceLightboxOpen(true)}
+                  >
+                    <Palette className="size-4" />
+                    레퍼런스 선택
+                  </SecondaryButton>
+                </div>
+
+                <button
+                  className="grid w-full gap-3 rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)] p-3 text-left transition-colors hover:border-[var(--studio-teal)] md:grid-cols-[160px_minmax(0,1fr)]"
+                  onClick={() => setIsReferenceLightboxOpen(true)}
+                  type="button"
+                >
+                  {selectedStyle?.thumbnail ? (
+                    <Image
+                      alt={`${selectedStyle.name} 레퍼런스`}
+                      className="aspect-[4/3] w-full rounded-md object-cover"
+                      height={160}
+                      src={selectedStyle.thumbnail}
+                      width={220}
+                    />
+                  ) : (
+                    <div className="flex aspect-[4/3] items-center justify-center rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/72 text-[var(--studio-subtle)]">
+                      <Palette className="size-10" />
+                    </div>
+                  )}
+                  <div className="min-w-0 self-center">
+                    <p className="text-sm font-bold text-[var(--studio-clay)]">
+                      {selectedStyle?.category ?? "레퍼런스"}
+                    </p>
+                    <p className="mt-1 text-xl font-extrabold text-[var(--studio-ink)]">
+                      {selectedStyle?.name ?? "선택 없음"}
+                    </p>
+                    <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-[var(--studio-subtle)]">
+                      {selectedStyle?.description ?? "결과에 적용할 시각 방향을 선택하세요."}
+                    </p>
+                  </div>
+                </button>
+
+                {selectedStyle &&
+                  (selectedStyle.requiresProductName || selectedStyle.requiresProductDetail) && (
+                    <div className="mt-3 grid gap-3 rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/58 p-4">
+                      {selectedStyle.requiresProductName && (
+                        <label className="block">
+                          <span className="text-sm font-extrabold text-[var(--studio-ink)]">
+                            제품명
+                          </span>
+                          <input
+                            className="studio-focus mt-2 h-11 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] px-3 text-sm font-bold text-[var(--studio-ink)] placeholder:text-[var(--studio-subtle)]"
+                            maxLength={60}
+                            onChange={(event) => setProductName(event.target.value)}
+                            placeholder="예: 모듈형 스마트 책상 조명"
+                            value={productName}
+                          />
+                        </label>
+                      )}
+                      {selectedStyle.requiresProductDetail && (
+                        <label className="block">
+                          <span className="text-sm font-extrabold text-[var(--studio-ink)]">
+                            제품 디테일
+                          </span>
+                          <textarea
+                            className="studio-focus mt-2 min-h-24 w-full rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] px-3 py-3 text-sm font-bold leading-6 text-[var(--studio-ink)] placeholder:text-[var(--studio-subtle)]"
+                            maxLength={260}
+                            onChange={(event) => setProductDetailDescription(event.target.value)}
+                            placeholder="재료, 기능, 보여주고 싶은 부분을 적어 주세요."
+                            value={productDetailDescription}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  )}
+              </section>
+
+              {errorMessage && <AlertMessage>{errorMessage}</AlertMessage>}
+            </div>
+          </Panel>
+
+          <Panel className="xl:sticky xl:top-4 xl:self-start" title="결과" subtitle="완성 이미지는 보관함에도 저장됩니다.">
+            <div
+              className={cn(
+                "relative flex items-center justify-center overflow-hidden rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)]",
+                selectedImageSizeValue === "1536x864"
+                  ? "aspect-video"
+                  : selectedImageSizeValue === "1152x1536"
+                    ? "aspect-[3/4]"
+                    : selectedImageSizeValue === "1536x1152"
+                      ? "aspect-[4/3]"
+                      : "aspect-square",
+              )}
+            >
+              {generatedImageUrl ? (
                 <Image
-                  alt=""
-                  aria-hidden="true"
-                  className="absolute inset-0 h-full w-full object-cover opacity-70"
+                  alt="생성된 AI 이미지"
+                  className="h-full w-full object-contain p-3"
                   height={720}
-                  src={studioAssets.emptyPreview}
+                  src={generatedImageUrl}
+                  unoptimized
                   width={720}
                 />
-                <div className="relative rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/88 px-5 py-4 text-center text-[var(--studio-subtle)] shadow-[var(--studio-shadow-xs)] backdrop-blur-sm">
-                  <Palette className="mx-auto size-14" />
-                  <p className="mt-3 text-lg font-extrabold text-[var(--studio-ink)]">완성 이미지 대기 중</p>
+              ) : (
+                <>
+                  <Image
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 h-full w-full object-cover opacity-70"
+                    height={720}
+                    src={studioAssets.emptyPreview}
+                    width={720}
+                  />
+                  <div className="relative rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/88 px-5 py-4 text-center text-[var(--studio-subtle)] shadow-[var(--studio-shadow-xs)] backdrop-blur-sm">
+                    <Palette className="mx-auto size-12" />
+                    <p className="mt-3 text-base font-extrabold text-[var(--studio-ink)]">
+                      생성 대기 중
+                    </p>
+                  </div>
+                </>
+              )}
+              {isGenerating && (
+                <div className="absolute inset-0 flex items-center justify-center bg-[#fffdfa]/78 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 rounded-md border border-[var(--studio-line)] bg-[#fffdfa] px-4 py-3 text-sm font-extrabold text-[var(--studio-ink)] shadow-[var(--studio-shadow-xs)]">
+                    <Loader2 className="size-5 animate-spin" />
+                    생성 중
+                  </div>
                 </div>
-              </>
-            )}
-          </div>
+              )}
+            </div>
 
-        {statusMessage && (
-          <div className="mt-4 flex items-center gap-2 rounded-lg border border-[rgb(86_127_132_/_0.34)] bg-[rgb(86_127_132_/_0.10)] p-3 text-sm font-bold text-[var(--studio-teal)]">
-            <CheckCircle2 className="size-5" />
-            {statusMessage}
-          </div>
-        )}
-        {errorMessage && <AlertMessage>{errorMessage}</AlertMessage>}
-
-        <div className="mt-5">
-          <SecondaryButton className="sm:w-full" onClick={onBack}>
-            <ArrowLeft className="size-5" />
-            레퍼런스 다시 고르기
-          </SecondaryButton>
-        </div>
-      </Panel>
-
-      <Panel title="생성 컨트롤" subtitle="레퍼런스와 횟수를 확인하세요.">
-        <div className="space-y-3 rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)] p-4">
-          <p className="text-sm font-bold text-[var(--studio-clay)]">선택한 레퍼런스</p>
-          <p className="text-pretty text-xl font-extrabold">{selectedStyle?.name}</p>
-          <p className="rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/72 px-3 py-2 text-sm font-bold text-[var(--studio-subtle)]">
-            남은 횟수 {remainingCount}/{totalGenerationLimit}
-          </p>
-          <PrimaryButton className="sm:w-full" disabled={isGenerating || hasReachedLimit} onClick={onGenerate}>
-            {isGenerating ? (
-              <Loader2 className="size-5 animate-spin" />
-            ) : (
-              <Sparkles className="size-5" />
-            )}
-            AI 이미지 생성
-          </PrimaryButton>
-          <SecondaryButton
-            className="sm:w-full"
-            disabled={hasMaxExtraCount}
-            onClick={() => {
-              setIsExtraRequestOpen((isOpen) => !isOpen);
-              setExtraRequestError("");
-              setExtraRequestMessage("");
-            }}
-          >
-            <Lock className="size-5" />
-            {hasMaxExtraCount ? "오늘 추가 완료" : "추가 횟수 요청"}
-          </SecondaryButton>
-          {isExtraRequestOpen && (
-            <form className="space-y-2" onSubmit={handleExtraSubmit}>
-              <label className="block text-sm font-bold text-[var(--studio-subtle)]" htmlFor="extra-count-password">
-                암호
-              </label>
-              <div className="flex gap-2">
-                <input
-                  autoComplete="off"
-                  className="studio-focus h-11 min-w-0 flex-1 rounded-md border border-[var(--studio-line)] bg-[#fffdfa] px-3 text-sm font-bold text-[var(--studio-ink)]"
-                  id="extra-count-password"
-                  onChange={(event) => {
-                    setExtraPassword(event.target.value);
-                    setExtraRequestError("");
-                  }}
-                  type="password"
-                  value={extraPassword}
-                />
-                <button
-                  className="studio-button-primary inline-flex h-11 shrink-0 items-center justify-center rounded-md px-4 text-sm font-extrabold transition-colors"
-                  type="submit"
-                >
-                  확인
-                </button>
+            <div className="mt-4 grid gap-2 rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)] p-3 text-sm font-bold text-[var(--studio-subtle)]">
+              <div className="flex items-center justify-between gap-3">
+                <span>첨부 이미지</span>
+                <span>{uploadedImages.length}/{generationConfig.maxUploadImageCount}</span>
               </div>
-            </form>
-          )}
-          {extraRequestMessage && (
-            <div className="flex items-center gap-2 rounded-lg border border-[rgb(86_127_132_/_0.34)] bg-[rgb(86_127_132_/_0.10)] p-3 text-sm font-bold text-[var(--studio-teal)]">
-              <CheckCircle2 className="size-5" />
-              {extraRequestMessage}
+              <div className="flex items-center justify-between gap-3">
+                <span>레퍼런스</span>
+                <span>{selectedStyle?.name ?? "선택 없음"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>비율</span>
+                <span>
+                  {imageSizeOptions.find((option) => option.value === selectedImageSizeValue)?.label ??
+                    "1:1"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>남은 횟수</span>
+                <span>{remainingCount}/{totalGenerationLimit}</span>
+              </div>
             </div>
-          )}
-          {extraRequestError && (
-            <div className="rounded-lg border border-[rgb(180_92_106_/_0.38)] bg-[rgb(180_92_106_/_0.10)] p-3 text-sm font-bold text-[var(--destructive)]">
-              {extraRequestError}
-            </div>
-          )}
-          <SecondaryButton className="sm:w-full" disabled={!generatedImageUrl} onClick={() => saveImage(generatedImageUrl)}>
-            <Download className="size-5" />
-            다운로드
-          </SecondaryButton>
-        </div>
-      </Panel>
 
+            {statusMessage && (
+              <div className="mt-4 flex items-center gap-2 rounded-lg border border-[rgb(86_127_132_/_0.34)] bg-[rgb(86_127_132_/_0.10)] p-3 text-sm font-bold text-[var(--studio-teal)]">
+                <CheckCircle2 className="size-5" />
+                {statusMessage}
+              </div>
+            )}
+
+            <div className="mt-4 grid gap-2">
+              <PrimaryButton
+                className="sm:w-full"
+                disabled={isGenerating || hasReachedLimit}
+                onClick={onGenerate}
+              >
+                {isGenerating ? (
+                  <Loader2 className="size-5 animate-spin" />
+                ) : (
+                  <Sparkles className="size-5" />
+                )}
+                AI 이미지 생성
+              </PrimaryButton>
+              <SecondaryButton
+                className="sm:w-full"
+                disabled={hasMaxExtraCount}
+                onClick={() => {
+                  setIsExtraRequestOpen((isOpen) => !isOpen);
+                  setExtraRequestError("");
+                  setExtraRequestMessage("");
+                }}
+              >
+                <Lock className="size-5" />
+                {hasMaxExtraCount ? "오늘 추가 완료" : "추가 횟수 요청"}
+              </SecondaryButton>
+              {isExtraRequestOpen && (
+                <form className="space-y-2" onSubmit={handleExtraSubmit}>
+                  <label className="block text-sm font-bold text-[var(--studio-subtle)]" htmlFor="workspace-extra-count-password">
+                    암호
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      autoComplete="off"
+                      className="studio-focus h-11 min-w-0 flex-1 rounded-md border border-[var(--studio-line)] bg-[#fffdfa] px-3 text-sm font-bold text-[var(--studio-ink)]"
+                      id="workspace-extra-count-password"
+                      onChange={(event) => {
+                        setExtraPassword(event.target.value);
+                        setExtraRequestError("");
+                      }}
+                      type="password"
+                      value={extraPassword}
+                    />
+                    <button
+                      className="studio-button-primary inline-flex h-11 shrink-0 items-center justify-center rounded-md px-4 text-sm font-extrabold transition-colors"
+                      type="submit"
+                    >
+                      확인
+                    </button>
+                  </div>
+                </form>
+              )}
+              {extraRequestMessage && (
+                <div className="flex items-center gap-2 rounded-lg border border-[rgb(86_127_132_/_0.34)] bg-[rgb(86_127_132_/_0.10)] p-3 text-sm font-bold text-[var(--studio-teal)]">
+                  <CheckCircle2 className="size-5" />
+                  {extraRequestMessage}
+                </div>
+              )}
+              {extraRequestError && (
+                <div className="rounded-lg border border-[rgb(180_92_106_/_0.38)] bg-[rgb(180_92_106_/_0.10)] p-3 text-sm font-bold text-[var(--destructive)]">
+                  {extraRequestError}
+                </div>
+              )}
+              <SecondaryButton
+                className="sm:w-full"
+                disabled={!generatedImageUrl}
+                onClick={() => saveImage(generatedImageUrl)}
+              >
+                <Download className="size-5" />
+                다운로드
+              </SecondaryButton>
+            </div>
+          </Panel>
+        </div>
+      </section>
+
+      {isReferenceLightboxOpen && (
+        <ReferenceLightbox
+          onClose={() => setIsReferenceLightboxOpen(false)}
+          onSelect={onSelectStyle}
+          selectedStyleId={selectedStyleId}
+        />
+      )}
+    </>
+  );
+}
+
+function ReferenceLightbox({
+  onClose,
+  onSelect,
+  selectedStyleId,
+}: {
+  onClose: () => void;
+  onSelect: (styleId: string) => void;
+  selectedStyleId: string;
+}) {
+  const [selectedCategory, setSelectedCategory] = useState("전체");
+  const visibleStylePresets = useMemo(
+    () =>
+      selectedCategory === "전체"
+        ? stylePresets
+        : stylePresets.filter((style) => style.category === selectedCategory),
+    [selectedCategory],
+  );
+
+  return (
+    <div
+      aria-label="레퍼런스 선택"
+      aria-modal="true"
+      className="fixed inset-0 z-50 bg-[#f6f0e7]/88 p-3 backdrop-blur-sm sm:p-5"
+      role="dialog"
+    >
+      <div className="studio-surface mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-xl">
+        <div className="flex flex-col gap-4 border-b border-[var(--studio-line)] p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
+          <div>
+            <p className="text-sm font-bold text-[var(--studio-clay)]">레퍼런스</p>
+            <h2 className="mt-1 text-2xl font-extrabold text-[var(--studio-ink)]">
+              시각 방향 선택
+            </h2>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="studio-button-secondary inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-bold"
+              onClick={onClose}
+              type="button"
+            >
+              선택 완료
+            </button>
+            <button
+              aria-label="레퍼런스 선택 닫기"
+              className="studio-button-secondary flex size-10 items-center justify-center rounded-md"
+              onClick={onClose}
+              type="button"
+            >
+              <X className="size-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto border-b border-[var(--studio-line)] p-3 sm:p-4">
+          {styleCategories.map((category) => (
+            <button
+              className={cn(
+                "h-9 shrink-0 rounded-md px-3 text-sm font-bold transition-colors",
+                selectedCategory === category
+                  ? "studio-chip-active"
+                  : "border border-[var(--studio-line)] bg-[#fffdfa]/72 text-[var(--studio-subtle)] hover:bg-[#f3eadf]",
+              )}
+              key={category}
+              onClick={() => setSelectedCategory(category)}
+              type="button"
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {visibleStylePresets.map((style) => (
+              <button
+                aria-pressed={style.id === selectedStyleId}
+                className={cn(
+                  "studio-thumbnail relative grid h-full overflow-hidden rounded-md text-left transition-all",
+                  style.id === selectedStyleId
+                    ? "border-[var(--studio-clay)] shadow-[0_0_0_2px_rgba(169,101,72,0.18),0_10px_22px_rgba(34,40,42,0.08)]"
+                    : "hover:border-[var(--studio-teal)] hover:shadow-[0_8px_20px_rgba(34,40,42,0.07)]",
+                )}
+                key={style.id}
+                onClick={() => onSelect(style.id)}
+                type="button"
+              >
+                {style.id === selectedStyleId && (
+                  <span className="absolute right-3 top-3 z-10 flex size-9 items-center justify-center rounded-md bg-[var(--studio-ink)] text-[#fffaf3] shadow-[var(--studio-shadow-xs)]">
+                    <CheckCircle2 className="size-5" />
+                  </span>
+                )}
+                {style.thumbnail ? (
+                  <Image
+                    alt={`${style.name} 썸네일`}
+                    className={cn(
+                      "aspect-[4/3] w-full",
+                      style.forcedImageSize
+                        ? "bg-[var(--studio-paper)] object-contain p-2"
+                        : "object-cover",
+                    )}
+                    height={300}
+                    src={style.thumbnail}
+                    width={400}
+                  />
+                ) : (
+                  <div className="flex aspect-[4/3] w-full items-center justify-center bg-[var(--studio-panel-soft)] text-[var(--studio-subtle)]">
+                    <Palette className="size-12" />
+                  </div>
+                )}
+                <div className="p-3">
+                  <p className="text-xs font-bold text-[var(--studio-clay)]">
+                    {style.category}
+                  </p>
+                  <p className="mt-1 text-base font-extrabold text-[var(--studio-ink)]">
+                    {style.name}
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-[var(--studio-subtle)]">
+                    {style.description}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

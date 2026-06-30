@@ -14,10 +14,10 @@ export type GeneratedImageHistoryItem = {
 };
 
 export type AppDraftState = {
-  uploadedImage: {
+  uploadedImages: {
     dataUrl: string;
     name: string;
-  } | null;
+  }[];
   studentDescription: string;
   productName: string;
   productDetailDescription: string;
@@ -62,19 +62,38 @@ function normalizeDraftState(value: unknown): AppDraftState | null {
   }
 
   const draft = value as Partial<AppDraftState>;
-  const uploadedImage =
-    draft.uploadedImage &&
-    typeof draft.uploadedImage === "object" &&
-    typeof draft.uploadedImage.dataUrl === "string" &&
-    typeof draft.uploadedImage.name === "string"
-      ? {
-          dataUrl: draft.uploadedImage.dataUrl,
-          name: draft.uploadedImage.name,
-        }
-      : null;
+  const legacyDraft = value as Partial<
+    AppDraftState & {
+      uploadedImage: {
+        dataUrl: string;
+        name: string;
+      } | null;
+    }
+  >;
+  const uploadedImages = Array.isArray(draft.uploadedImages)
+    ? draft.uploadedImages
+        .filter(
+          (image) =>
+            image &&
+            typeof image === "object" &&
+            typeof image.dataUrl === "string" &&
+            typeof image.name === "string",
+        )
+        .slice(0, generationConfig.maxUploadImageCount)
+    : legacyDraft.uploadedImage &&
+        typeof legacyDraft.uploadedImage === "object" &&
+        typeof legacyDraft.uploadedImage.dataUrl === "string" &&
+        typeof legacyDraft.uploadedImage.name === "string"
+      ? [
+          {
+            dataUrl: legacyDraft.uploadedImage.dataUrl,
+            name: legacyDraft.uploadedImage.name,
+          },
+        ]
+      : [];
 
   return {
-    uploadedImage,
+    uploadedImages,
     studentDescription:
       typeof draft.studentDescription === "string" ? draft.studentDescription : "",
     productName: typeof draft.productName === "string" ? draft.productName : "",
