@@ -12,6 +12,7 @@ import {
   Loader2,
   Lock,
   Palette,
+  RotateCcw,
   Settings,
   Sparkles,
   Upload,
@@ -180,13 +181,6 @@ export function ImageGenerationApp() {
   const totalGenerationLimit = generationConfig.maxCount + generationUsage.extraCount;
   const remainingCount = Math.max(totalGenerationLimit - generationUsage.count, 0);
   const hasReachedLimit = generationUsage.count >= totalGenerationLimit;
-  const canOpenStyleStep = Boolean(studentDescription.trim());
-  const hasRequiredProductName = !selectedStyle?.requiresProductName || Boolean(productName.trim());
-  const hasRequiredProductDetail =
-    !selectedStyle?.requiresProductDetail || Boolean(productDetailDescription.trim());
-  const canOpenGenerateStep = Boolean(
-    canOpenStyleStep && selectedStyle && hasRequiredProductName && hasRequiredProductDetail,
-  );
 
   useEffect(() => {
     document.documentElement.classList.remove("dark");
@@ -326,6 +320,12 @@ export function ImageGenerationApp() {
     setUploadedImages((currentImages) =>
       currentImages.filter((_, imageIndex) => imageIndex !== index),
     );
+    setErrorMessage("");
+  }
+
+  function handleResetGeneratedImage() {
+    setGeneratedImageUrl("");
+    setStatusMessage("");
     setErrorMessage("");
   }
 
@@ -474,6 +474,29 @@ export function ImageGenerationApp() {
     };
   }
 
+  function handleResetGenerationUsage(password: string) {
+    if (password !== generationConfig.extraRequestPassword) {
+      return {
+        success: false,
+        message: "암호가 맞지 않습니다.",
+      };
+    }
+
+    const nextUsage = {
+      ...generationUsage,
+      count: 0,
+      extraCount: 0,
+    };
+
+    setGenerationUsage(nextUsage);
+    setGenerationUsageState(getGenerationUsage());
+
+    return {
+      success: true,
+      message: "오늘 생성 횟수가 초기화되었습니다.",
+    };
+  }
+
   return (
     <main className="studio-shell min-h-screen p-3 sm:p-4">
       <div className="mx-auto grid h-[calc(100dvh-1.5rem)] min-h-[680px] w-full max-w-[1540px] overflow-hidden rounded-xl border border-[var(--studio-line)] bg-[#fffdfa]/82 shadow-[var(--studio-shadow-md)] sm:h-[calc(100dvh-2rem)] lg:grid-cols-[132px_minmax(0,1fr)]">
@@ -498,8 +521,6 @@ export function ImageGenerationApp() {
 
             {page !== "home" && page !== "step-4" && (
               <CreateWorkspace
-                canOpenGenerateStep={canOpenGenerateStep}
-                canOpenStyleStep={canOpenStyleStep}
                 errorMessage={errorMessage}
                 fileInputRef={fileInputRef}
                 generatedImageUrl={generatedImageUrl}
@@ -510,6 +531,8 @@ export function ImageGenerationApp() {
                 onGuideOpen={() => setIsGuideOpen(true)}
                 onRemoveUploadedImage={handleRemoveUploadedImage}
                 onRequestExtraCount={handleRequestExtraCount}
+                onResetGeneratedImage={handleResetGeneratedImage}
+                onResetGenerationUsage={handleResetGenerationUsage}
                 onSelectStyle={handleSelectStyle}
                 productDetailDescription={productDetailDescription}
                 productName={productName}
@@ -871,8 +894,6 @@ function HomePage({
 }
 
 function CreateWorkspace({
-  canOpenGenerateStep,
-  canOpenStyleStep,
   errorMessage,
   fileInputRef,
   generatedImageUrl,
@@ -883,6 +904,8 @@ function CreateWorkspace({
   onGuideOpen,
   onRemoveUploadedImage,
   onRequestExtraCount,
+  onResetGeneratedImage,
+  onResetGenerationUsage,
   onSelectStyle,
   productDetailDescription,
   productName,
@@ -899,8 +922,6 @@ function CreateWorkspace({
   totalGenerationLimit,
   uploadedImages,
 }: {
-  canOpenGenerateStep: boolean;
-  canOpenStyleStep: boolean;
   errorMessage: string;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   generatedImageUrl: string;
@@ -911,6 +932,11 @@ function CreateWorkspace({
   onGuideOpen: () => void;
   onRemoveUploadedImage: (index: number) => void;
   onRequestExtraCount: (password: string) => {
+    success: boolean;
+    message: string;
+  };
+  onResetGeneratedImage: () => void;
+  onResetGenerationUsage: (password: string) => {
     success: boolean;
     message: string;
   };
@@ -932,9 +958,13 @@ function CreateWorkspace({
 }) {
   const [isReferenceLightboxOpen, setIsReferenceLightboxOpen] = useState(false);
   const [isExtraRequestOpen, setIsExtraRequestOpen] = useState(false);
+  const [isResetUsageOpen, setIsResetUsageOpen] = useState(false);
   const [extraPassword, setExtraPassword] = useState("");
   const [extraRequestError, setExtraRequestError] = useState("");
   const [extraRequestMessage, setExtraRequestMessage] = useState("");
+  const [resetUsagePassword, setResetUsagePassword] = useState("");
+  const [resetUsageError, setResetUsageError] = useState("");
+  const [resetUsageMessage, setResetUsageMessage] = useState("");
   const selectedImageSizeValue = selectedStyle?.forcedImageSize ?? selectedImageSize;
   const hasMaxExtraCount =
     totalGenerationLimit >= generationConfig.maxCount + generationConfig.maxExtraCount;
@@ -963,40 +993,32 @@ function CreateWorkspace({
     setExtraRequestMessage("");
   }
 
+  function handleResetUsageSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!resetUsagePassword.trim()) {
+      setResetUsageError("암호를 입력해 주세요.");
+      setResetUsageMessage("");
+      return;
+    }
+
+    const result = onResetGenerationUsage(resetUsagePassword.trim());
+
+    if (result.success) {
+      setResetUsageMessage(result.message);
+      setResetUsageError("");
+      setResetUsagePassword("");
+      setIsResetUsageOpen(false);
+      return;
+    }
+
+    setResetUsageError(result.message);
+    setResetUsageMessage("");
+  }
+
   return (
     <>
       <section className="space-y-4">
-        <div className="studio-toolbar sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-xl p-2">
-          {[
-            { label: "입력", active: true, complete: canOpenStyleStep },
-            { label: "레퍼런스", active: canOpenStyleStep, complete: Boolean(selectedStyle) },
-            { label: "생성", active: canOpenGenerateStep, complete: Boolean(generatedImageUrl) },
-          ].map((item, index) => (
-            <div
-              className={cn(
-                "flex h-11 items-center gap-2 rounded-md border px-3 text-sm font-extrabold",
-                item.active
-                  ? "border-[var(--studio-line-strong)] bg-[#fffdfa] text-[var(--studio-ink)]"
-                  : "border-[var(--studio-line)] bg-[#f3eadf]/52 text-[var(--studio-subtle)]",
-              )}
-              key={item.label}
-            >
-              <span
-                className={cn(
-                  "flex size-6 items-center justify-center rounded-full text-xs",
-                  item.complete
-                    ? "bg-[var(--studio-ink)] text-[#fffaf3]"
-                    : "bg-[var(--studio-panel-soft)] text-[var(--studio-subtle)]",
-                )}
-              >
-                {item.complete ? <CheckCircle2 className="size-4" /> : index + 1}
-              </span>
-              {item.label}
-              {index < 2 && <ArrowRight className="size-4 text-[var(--studio-subtle)]" />}
-            </div>
-          ))}
-        </div>
-
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
           <Panel title="작업 입력" subtitle="이미지, 프롬프트, 레퍼런스를 한 화면에서 선택하세요.">
             <input
@@ -1112,7 +1134,7 @@ function CreateWorkspace({
                 <h3 className="mb-3 text-base font-extrabold text-[var(--studio-ink)]">
                   이미지 비율
                 </h3>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                   {imageSizeOptions.map((option) => (
                     <button
                       aria-pressed={selectedImageSizeValue === option.value}
@@ -1234,6 +1256,8 @@ function CreateWorkspace({
                 "relative flex items-center justify-center overflow-hidden rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)]",
                 selectedImageSizeValue === "1536x864"
                   ? "aspect-video"
+                  : selectedImageSizeValue === "864x1536"
+                    ? "aspect-[9/16]"
                   : selectedImageSizeValue === "1152x1536"
                     ? "aspect-[3/4]"
                     : selectedImageSizeValue === "1536x1152"
@@ -1325,8 +1349,11 @@ function CreateWorkspace({
                 disabled={hasMaxExtraCount}
                 onClick={() => {
                   setIsExtraRequestOpen((isOpen) => !isOpen);
+                  setIsResetUsageOpen(false);
                   setExtraRequestError("");
                   setExtraRequestMessage("");
+                  setResetUsageError("");
+                  setResetUsageMessage("");
                 }}
               >
                 <Lock className="size-5" />
@@ -1369,6 +1396,65 @@ function CreateWorkspace({
                   {extraRequestError}
                 </div>
               )}
+              <SecondaryButton
+                className="sm:w-full"
+                onClick={() => {
+                  setIsResetUsageOpen((isOpen) => !isOpen);
+                  setIsExtraRequestOpen(false);
+                  setExtraRequestError("");
+                  setExtraRequestMessage("");
+                  setResetUsageError("");
+                  setResetUsageMessage("");
+                }}
+              >
+                <Lock className="size-5" />
+                생성 횟수 초기화
+              </SecondaryButton>
+              {isResetUsageOpen && (
+                <form className="space-y-2" onSubmit={handleResetUsageSubmit}>
+                  <label className="block text-sm font-bold text-[var(--studio-subtle)]" htmlFor="workspace-reset-count-password">
+                    암호
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      autoComplete="off"
+                      className="studio-focus h-11 min-w-0 flex-1 rounded-md border border-[var(--studio-line)] bg-[#fffdfa] px-3 text-sm font-bold text-[var(--studio-ink)]"
+                      id="workspace-reset-count-password"
+                      onChange={(event) => {
+                        setResetUsagePassword(event.target.value);
+                        setResetUsageError("");
+                      }}
+                      type="password"
+                      value={resetUsagePassword}
+                    />
+                    <button
+                      className="studio-button-primary inline-flex h-11 shrink-0 items-center justify-center rounded-md px-4 text-sm font-extrabold transition-colors"
+                      type="submit"
+                    >
+                      확인
+                    </button>
+                  </div>
+                </form>
+              )}
+              {resetUsageMessage && (
+                <div className="flex items-center gap-2 rounded-lg border border-[rgb(86_127_132_/_0.34)] bg-[rgb(86_127_132_/_0.10)] p-3 text-sm font-bold text-[var(--studio-teal)]">
+                  <CheckCircle2 className="size-5" />
+                  {resetUsageMessage}
+                </div>
+              )}
+              {resetUsageError && (
+                <div className="rounded-lg border border-[rgb(180_92_106_/_0.38)] bg-[rgb(180_92_106_/_0.10)] p-3 text-sm font-bold text-[var(--destructive)]">
+                  {resetUsageError}
+                </div>
+              )}
+              <SecondaryButton
+                className="sm:w-full"
+                disabled={!generatedImageUrl}
+                onClick={onResetGeneratedImage}
+              >
+                <RotateCcw className="size-5" />
+                결과 초기화
+              </SecondaryButton>
               <SecondaryButton
                 className="sm:w-full"
                 disabled={!generatedImageUrl}
@@ -1725,10 +1811,10 @@ function GuideModal({ onClose }: { onClose: () => void }) {
       className="fixed inset-0 z-50 bg-[#f6f0e7]/84 p-4 backdrop-blur"
       role="dialog"
     >
-      <div className="studio-surface mx-auto max-h-[calc(100vh-2rem)] max-w-2xl overflow-auto rounded-xl p-5">
+      <div className="studio-surface mx-auto max-h-[calc(100vh-2rem)] max-w-3xl overflow-auto rounded-xl p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-bold text-[var(--studio-clay)]">프롬프트 가이드</p>
+            <p className="text-sm font-bold text-[var(--studio-clay)]">{guideCopy.eyebrow}</p>
             <h2 className="text-2xl font-extrabold">{guideCopy.title}</h2>
             <p className="mt-2 text-sm font-semibold leading-6 text-[var(--studio-subtle)]">
               {guideCopy.description}
@@ -1743,7 +1829,16 @@ function GuideModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="mt-5 rounded-lg border border-[var(--studio-line)] bg-[var(--studio-paper)] p-4">
+          <p className="text-sm font-extrabold text-[var(--studio-clay)]">
+            {guideCopy.templateTitle}
+          </p>
+          <p className="mt-2 text-base font-extrabold leading-7 text-[var(--studio-ink)]">
+            {guideCopy.template}
+          </p>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {guideCopy.sections.map((section, index) => {
             const Icon = steps[index]?.icon ?? Palette;
 
@@ -1752,11 +1847,18 @@ function GuideModal({ onClose }: { onClose: () => void }) {
               className="studio-workbench rounded-lg p-4"
               key={section.title}
             >
-              <span className="flex size-9 items-center justify-center rounded-md bg-[var(--studio-panel)] text-[var(--studio-sage)] shadow-[var(--studio-shadow-xs)]">
-                <Icon className="size-4" />
-              </span>
-              <h3 className="mt-3 font-extrabold">{section.title}</h3>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[var(--studio-subtle)]">
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--studio-panel)] text-[var(--studio-sage)] shadow-[var(--studio-shadow-xs)]">
+                  <Icon className="size-4" />
+                </span>
+                <div>
+                  <h3 className="font-extrabold">{section.title}</h3>
+                  <p className="mt-1 text-sm font-bold leading-5 text-[var(--studio-subtle)]">
+                    {section.short}
+                  </p>
+                </div>
+              </div>
+              <p className="mt-3 rounded-md border border-[var(--studio-line)] bg-[#fffdfa]/72 px-3 py-2 text-sm font-extrabold leading-6 text-[var(--studio-ink)]">
                 {section.example}
               </p>
             </div>
@@ -1764,8 +1866,23 @@ function GuideModal({ onClose }: { onClose: () => void }) {
           })}
         </div>
 
-        <div className="mt-4 rounded-lg border border-dashed border-[var(--studio-line)] bg-[var(--studio-paper)] p-4 text-sm font-extrabold leading-7">
-          {guideCopy.template}
+        <div className="mt-4 grid gap-3 rounded-lg border border-[var(--studio-line)] bg-[#fffdfa]/64 p-4 md:grid-cols-2">
+          <div>
+            <p className="text-sm font-extrabold text-[var(--studio-subtle)]">
+              {guideCopy.examples.weak.label}
+            </p>
+            <p className="mt-2 rounded-md border border-[var(--studio-line)] bg-[var(--studio-paper)] p-3 text-sm font-bold leading-6 text-[var(--studio-subtle)]">
+              {guideCopy.examples.weak.text}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-extrabold text-[var(--studio-clay)]">
+              {guideCopy.examples.strong.label}
+            </p>
+            <p className="mt-2 rounded-md border border-[rgb(86_127_132_/_0.28)] bg-[rgb(86_127_132_/_0.10)] p-3 text-sm font-extrabold leading-6 text-[var(--studio-ink)]">
+              {guideCopy.examples.strong.text}
+            </p>
+          </div>
         </div>
       </div>
     </div>

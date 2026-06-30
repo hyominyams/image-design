@@ -26,6 +26,7 @@ export const imageSizeOptions = [
   { label: "16:9", value: "1536x864" },
   { label: "4:3", value: "1536x1152" },
   { label: "3:4", value: "1152x1536" },
+  { label: "9:16", value: "864x1536" },
 ] as const;
 
 export type ImageSize = (typeof imageSizeOptions)[number]["value"];
