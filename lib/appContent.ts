@@ -1,99 +1,169 @@
+/**
+ * All user-facing copy. Components never inline Korean strings, so wording can
+ * be revised (or translated) without touching layout.
+ */
 export const appCopy = {
   metadata: {
-    title: "AI 이미지 스튜디오",
+    title: "디자인 스튜디오",
     description:
-      "프롬프트와 선택 이미지, 레퍼런스 디자인을 바탕으로 이미지를 생성하는 웹앱입니다.",
+      "직접 그린 그림이나 찾은 레퍼런스를 올리고, 짧은 설명만으로 원하는 이미지를 만드는 도구입니다.",
   },
-  hero: {
-    eyebrow: "AI 이미지 스튜디오",
-    title: "스튜디오에서 이미지 만들기",
+  app: {
+    name: "디자인 스튜디오",
+    tagline: "그림을 올리고, 설명을 쓰고, 만들기",
+  },
+  steps: {
+    references: {
+      label: "참고 이미지",
+      title: "참고할 이미지를 올려 주세요",
+      description:
+        "직접 그린 그림, 인터넷에서 찾은 레퍼런스 무엇이든 좋아요. 없어도 괜찮습니다.",
+    },
+    prompt: {
+      label: "설명",
+      title: "무엇을 만들고 싶나요?",
+      description: "짧아도 괜찮아요. 나머지는 AI가 채워 줍니다.",
+    },
+    result: {
+      label: "결과",
+      title: "완성된 이미지",
+      description: "마음에 들지 않으면 설명을 고쳐서 다시 만들어 보세요.",
+    },
+  },
+  references: {
+    uploadTitle: "이미지 올리기",
+    uploadHint: "클릭하거나 파일을 끌어다 놓으세요",
+    uploadMeta: "JPG · PNG · WEBP / 최대 {size} / 최대 {count}장",
+    libraryButton: "레퍼런스 고르기",
+    libraryHint: "올릴 이미지가 없다면 여기서 고르세요",
+    emptyTitle: "아직 올린 이미지가 없어요",
+    emptyDescription: "이미지 없이 설명만으로 만들 수도 있습니다.",
+    noteLabel: "이 이미지를 어떻게 쓸까요?",
+    notePlaceholder: "예: 내가 그린 손 그림이에요. 이 모양을 그대로 살려 주세요.",
+    noteHelp: "이 칸에 쓴 내용대로 AI가 각 이미지를 다르게 사용합니다.",
+    removeLabel: "이미지 빼기",
+    countLabel: "{count}장",
+    fallbackLabel: "참고 이미지",
+    uploadBadge: "직접 올림",
+    libraryBadge: "레퍼런스",
+    fullTitle: "참고 이미지를 가득 채웠어요",
+    fullDescription: "하나를 빼면 더 넣을 수 있어요.",
+  },
+  /** One-tap fillers for the per-image note field. */
+  noteSuggestions: [
+    { label: "내가 그린 그림", note: "제가 직접 그린 그림이에요. 이 모양과 특징을 그대로 살려 주세요." },
+    { label: "화풍만 참고", note: "이 이미지의 화풍과 질감만 참고해 주세요. 그려진 대상은 따라하지 마세요." },
+    { label: "색감만 참고", note: "이 이미지의 색감만 참고해 주세요." },
+    { label: "구도만 참고", note: "이 이미지의 구도와 화면 배치만 참고해 주세요." },
+    { label: "이 물건이 주인공", note: "이 이미지에 있는 물건이 결과물의 주인공이에요." },
+  ],
+  library: {
+    title: "레퍼런스 고르기",
     description:
-      "프롬프트, 참고 이미지, 레퍼런스 디자인으로 원하는 이미지를 만드세요.",
-    guideCta: "프롬프트 도움",
+      "올릴 이미지가 없을 때 쓰세요. 고르면 참고 이미지 목록에 그대로 들어갑니다.",
+    searchPlaceholder: "이름으로 찾기",
+    empty: "검색 결과가 없어요.",
+    featuredLabel: "많이 쓰는 것",
+    added: "추가됨",
+    close: "닫기",
   },
-  nav: [
-    { id: "upload", label: "작업 이미지" },
-    { id: "description", label: "프롬프트" },
-    { id: "styles", label: "레퍼런스" },
-    { id: "result", label: "결과" },
-    { id: "gallery", label: "보관함" },
-  ],
-  steps: [
-    "이미지 추가",
-    "프롬프트 쓰기",
-    "레퍼런스 디자인 선택",
-    "AI 이미지 만들기",
-    "완성 이미지 받기",
-  ],
-  theme: {
-    light: "라이트",
-    dark: "다크",
-    toggleToLight: "라이트 모드로 전환",
-    toggleToDark: "다크 모드로 전환",
-  },
-  upload: {
-    title: "작업 이미지",
-    description: "참고할 이미지가 있으면 추가하세요.",
-    button: "이미지 고르기",
-    helper: "이미지 파일은 5MB 이하로 올려 주세요.",
-    empty: "참고 이미지 추가",
-  },
-  description: {
-    title: "프롬프트",
-    placeholder: "만들고 싶은 이미지의 대상, 분위기, 색감, 구도, 용도를 적어 주세요.",
-    example:
-      "예시: 햇빛이 들어오는 작은 작업실 책상 위에 세라믹 머그컵과 스케치북이 놓인 사진. 따뜻한 자연광, 차분한 색감, 잡지 화보 같은 구도.",
-    exampleParts: [
-      {
-        label: "대상",
-        text: "무엇이 중심에 보여야 하는지 적어요.",
-      },
-      {
-        label: "분위기",
-        text: "밝고 따뜻한지, 차분한지, 역동적인지 정해요.",
-      },
-      {
-        label: "구도",
-        text: "가까운 장면, 넓은 장면, 정면, 위에서 본 장면처럼 적어요.",
-      },
+  prompt: {
+    label: "만들고 싶은 이미지 설명",
+    placeholder:
+      "예: 내가 그린 가방을 실제 제품 사진처럼 만들어 줘. 밝은 회색 배경에, 옆에서 본 모습으로.",
+    help: "무엇을 / 어떤 분위기로 / 어디에 쓸 건지 정도만 적어도 충분해요.",
+    tipsTitle: "이렇게 적으면 좋아요",
+    tips: [
+      "무엇이 주인공인지 — 가방, 캐릭터, 포스터처럼",
+      "어떤 느낌인지 — 밝고 따뜻하게, 차분하게",
+      "어디에 쓸 건지 — 발표 자료, 상세페이지, 전시",
     ],
+    counter: "{current} / {max}자",
   },
-  styles: {
-    title: "레퍼런스",
-    description: "결과에 어울리는 시각 방향을 선택하세요.",
+  sections: {
+    optional: "선택",
+    required: "필수",
   },
-  counter: {
-    title: "남은 생성 횟수",
-    limitNotice:
-      "이미지는 최대 5번까지 만들 수 있어요. 프롬프트를 확인한 뒤 생성해 주세요.",
-    storageNotice:
-      "이 제한은 브라우저에 저장되므로 브라우저 데이터 삭제 시 초기화될 수 있습니다.",
+  size: {
+    label: "이미지 비율",
+    help: "고른 레퍼런스에 어울리는 비율이 자동으로 맞춰집니다.",
   },
   actions: {
-    generate: "AI 이미지 생성하기",
-    generating: "AI가 이미지를 만들고 있어요. 잠시만 기다려 주세요.",
-    download: "이미지 다운로드",
-    resetResult: "결과 지우기",
+    generate: "이미지 만들기",
+    generating: "만드는 중...",
+    regenerate: "다시 만들기",
+    download: "내려받기",
+    next: "다음",
+    back: "이전",
+    startOver: "처음부터",
+  },
+  startOver: {
+    title: "처음부터 다시 할까요?",
+    description:
+      "올린 이미지, 이미지별 설명, 프롬프트가 모두 지워지고 되돌릴 수 없어요. 만든 이미지 보관함은 그대로 남아요.",
+    cancel: "계속 작업하기",
+    confirm: "모두 지우기",
   },
   result: {
-    title: "결과",
-    empty: "생성된 이미지가 이곳에 나타나요.",
-    success: "이미지가 완성되었습니다.",
+    imageAlt: "생성된 이미지",
+    emptyTitle: "아직 만든 이미지가 없어요",
+    emptyDescription: "왼쪽에서 설명을 쓰고 만들기를 눌러 보세요.",
+    loadingTitle: "이미지를 만들고 있어요",
+    loadingDescription: "보통 20초에서 1분 정도 걸립니다.",
   },
   history: {
-    title: "완성 이미지 보관함",
-    description: "이 기기에서 최근 5개까지 다시 볼 수 있어요.",
-    empty: "아직 저장된 완성 이미지가 없어요.",
+    title: "만든 이미지",
+    description: "이 기기에 최근 {count}개까지 남아요.",
+    empty: "아직 저장된 이미지가 없어요.",
+    clear: "모두 지우기",
+    remove: "지우기",
   },
   errors: {
-    imageRequired: "참고 이미지를 다시 확인해 주세요.",
-    descriptionRequired: "프롬프트를 작성해 주세요.",
-    productNameRequired: "제품명을 입력해 주세요.",
-    productDetailRequired: "제품의 재료와 기능을 입력해 주세요.",
-    styleRequired: "레퍼런스 디자인을 선택해 주세요.",
-    limitReached: "이미지 생성 가능 횟수를 모두 사용했습니다.",
-    fileTooLarge: "이미지 파일 크기는 5MB 이하로 올려 주세요.",
-    invalidFileType: "jpg, png, webp 형식의 이미지만 올릴 수 있습니다.",
-    generationFailed: "이미지 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    promptRequired: "만들고 싶은 이미지를 설명해 주세요.",
+    tooManyReferences: "참고 이미지는 최대 {count}장까지 넣을 수 있어요.",
+    fileTooLarge: "이미지는 {size} 이하로 올려 주세요.",
+    invalidFileType: "JPG, PNG, WEBP 형식만 올릴 수 있어요.",
+    readFailed: "이미지를 읽지 못했어요. 다른 파일로 시도해 주세요.",
+    generationFailed: "이미지 생성에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  },
+  /** Returned by the API route; shown to the student verbatim. */
+  serverErrors: {
+    missingApiKey:
+      "이미지 생성 설정이 필요합니다. OPENAI_API_KEY 환경 변수를 추가한 뒤 서버를 다시 시작해 주세요.",
+    promptRequired: "만들고 싶은 이미지를 설명해 주세요.",
+    promptTooLong: "설명이 너무 길어요. 조금 줄여 주세요.",
+    tooManyReferences: "참고 이미지는 최대 {count}장까지 넣을 수 있어요.",
+    tooManyInputs: "참고 이미지가 너무 많아요.",
+    presetNotFound: "선택한 레퍼런스를 찾을 수 없어요.",
+    uploadUnreadable: "올린 이미지를 읽지 못했어요. 다른 파일로 시도해 주세요.",
+    uploadInvalidType: "JPG, PNG, WEBP 형식만 올릴 수 있어요.",
+    uploadTooLarge: "이미지는 {size} 이하로 올려 주세요.",
+    referenceUnavailable: "참고 이미지를 준비하지 못했어요. 잠시 후 다시 시도해 주세요.",
+    uploadFallbackLabel: "이미지 {index}",
+    generic: "이미지를 만드는 중에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.",
+    rejected:
+      "이 요청으로는 이미지를 만들 수 없어요. 프롬프트나 올린 이미지를 바꿔서 다시 시도해 주세요.",
+    invalidApiKey: "API 키 설정을 확인해 주세요.",
+    forbidden: "이미지 생성 권한을 확인해 주세요. OpenAI 프로젝트 설정이 필요합니다.",
+    modelNotFound: "이미지 생성 모델을 찾을 수 없어요. 모델 설정을 확인해 주세요.",
+    rateLimited: "요청이 몰리고 있어요. 잠시 후 다시 시도해 주세요.",
+    upstreamUnavailable: "이미지 생성 서버가 불안정해요. 잠시 후 다시 시도해 주세요.",
+    requestFailed: "요청을 처리하지 못했어요. 입력 내용을 확인해 주세요.",
+  },
+  toasts: {
+    generated: "이미지가 완성됐어요.",
+    saved: "내려받기를 시작했어요.",
+    referenceAdded: "참고 이미지에 추가했어요.",
+    historyCleared: "저장된 이미지를 모두 지웠어요.",
   },
 } as const;
+
+/** Replaces `{token}` placeholders in the copy above. */
+export function fillCopy(
+  template: string,
+  values: Record<string, string | number>,
+) {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+    key in values ? String(values[key]) : match,
+  );
+}

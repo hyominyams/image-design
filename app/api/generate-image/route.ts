@@ -1,156 +1,65 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
-import OpenAI, { APIError, toFile } from "openai";
 
-import { defaultImageSize, generationConfig, imageSizeOptions } from "@/lib/config";
-import { buildImagePrompt } from "@/lib/imagePrompt";
-import { getStylePreset } from "@/lib/stylePresets";
+import { appCopy, fillCopy } from "@/lib/appContent";
+import { defaultImageSize, generationConfig, imageSizeOptions, uploadConfig } from "@/lib/config";
+import {
+  buildEnhancerInput,
+  buildFallbackPrompt,
+  enhancerSystemPrompt,
+  type PromptReference,
+} from "@/lib/promptBuilder";
+import { getLibraryPreset } from "@/lib/referenceLibrary";
+import {
+  describeOpenAIError,
+  getImageModel,
+  getOpenAIClient,
+  getTextModel,
+  readLibraryImage,
+  readUploadedImage,
+  UserFacingError,
+} from "@/lib/server/openai";
+import type { GenerationRequest } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 180;
 
-type GenerateImageRequest = {
-  productDetailDescription?: string;
-  productName?: string;
-  uploadedImageBase64?: string;
-  uploadedImageBase64s?: string[];
-  imageSize?: string;
-  prompt?: string;
-  studentDescription?: string;
-  styleId?: string;
-};
-
-const dataUrlPattern = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/;
-const defaultImageModel = "gpt-image-2";
-const missingApiKeyError =
-  "이미지 생성 설정이 필요합니다. OPENAI_API_KEY 환경 변수를 추가한 뒤 서버를 다시 시작해 주세요.";
-
-function getImageModel() {
-  return process.env.OPENAI_IMAGE_MODEL ?? defaultImageModel;
-}
-
-function getImageSize(imageSize?: string) {
-  const selectedOption = imageSizeOptions.find((option) => option.value === imageSize);
-
-  return selectedOption?.value ?? defaultImageSize;
-}
-
-function parseDataUrl(dataUrl: string) {
-  const match = dataUrl.match(dataUrlPattern);
-
-  if (!match) {
-    return null;
-  }
-
-  return {
-    mimeType: match[1],
-    base64: match[2],
-  };
-}
-
-function getImageExtension(mimeType: string) {
-  if (mimeType === "image/jpeg") {
-    return "jpg";
-  }
-
-  if (mimeType === "image/webp") {
-    return "webp";
-  }
-
-  return "png";
-}
-
-function getMimeTypeFromPath(filePath: string) {
-  if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
-    return "image/jpeg";
-  }
-
-  if (filePath.endsWith(".webp")) {
-    return "image/webp";
-  }
-
-  return "image/png";
-}
-
-async function getStyleReferenceFile(imagePath: string) {
-  const relativePath = imagePath.replace(/^\/+/, "");
-  const referencePath = join(process.cwd(), "public", relativePath);
-  const referenceStats = await stat(referencePath);
-
-  if (referenceStats.size > generationConfig.maxReferenceFileSizeBytes) {
-    throw new Error(`Style reference image is too large: ${imagePath}`);
-  }
-
-  const referenceBuffer = await readFile(referencePath);
-  const mimeType = getMimeTypeFromPath(referencePath);
-
-  return toFile(
-    referenceBuffer,
-    `style-reference.${getImageExtension(mimeType)}`,
-    { type: mimeType },
+function resolveImageSize(value: unknown) {
+  return (
+    imageSizeOptions.find((option) => option.value === value)?.value ??
+    defaultImageSize
   );
 }
 
-async function getStyleReferenceFiles(imagePaths: string[]) {
-  return Promise.all(imagePaths.map((imagePath) => getStyleReferenceFile(imagePath)));
-}
+/**
+ * Rewrites the student's Korean request into a single English image prompt.
+ * Never throws: if the text model is unavailable the caller falls back to a
+ * locally assembled prompt so the student still gets a picture.
+ */
+async function enhancePrompt(
+  client: NonNullable<ReturnType<typeof getOpenAIClient>>,
+  prompt: string,
+  references: PromptReference[],
+) {
+  try {
+    const completion = await client.chat.completions.create({
+      model: getTextModel(),
+      messages: [
+        { role: "system", content: enhancerSystemPrompt },
+        { role: "user", content: buildEnhancerInput(prompt, references) },
+      ],
+    });
+    const enhanced = completion.choices[0]?.message?.content?.trim();
 
-function getOpenAIErrorMessage(error: unknown) {
-  if (!(error instanceof APIError)) {
-    return {
-      status: 500,
-      code: "image_generation_failed",
-      message: "이미지 생성 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
-    };
+    if (!enhanced) {
+      throw new Error("The enhancer returned an empty prompt.");
+    }
+
+    return { prompt: enhanced, fallback: false };
+  } catch (error) {
+    console.warn("Prompt enhancement failed, using the local fallback.", error);
+
+    return { prompt: buildFallbackPrompt(prompt, references), fallback: true };
   }
-
-  if (error.status === 401) {
-    return {
-      status: 500,
-      code: "invalid_api_key",
-      message: "이미지 생성 설정을 확인해 주세요. API 키가 올바르지 않습니다.",
-    };
-  }
-
-  if (error.status === 403) {
-    return {
-      status: 403,
-      code: "image_model_forbidden",
-      message:
-        "이미지 생성 권한을 확인해 주세요. OpenAI 프로젝트 또는 조직 설정이 필요합니다.",
-    };
-  }
-
-  if (error.status === 404) {
-    return {
-      status: 500,
-      code: "image_model_not_found",
-      message: "이미지 생성 모델을 찾을 수 없습니다. 배포된 모델 설정을 확인해 주세요.",
-    };
-  }
-
-  if (error.status === 429) {
-    return {
-      status: 429,
-      code: "rate_limited",
-      message: "이미지 생성 요청이 많습니다. 잠시 후 다시 시도해 주세요.",
-    };
-  }
-
-  if (error.status && error.status >= 500) {
-    return {
-      status: 502,
-      code: "openai_unavailable",
-      message: "OpenAI 서비스 응답이 불안정합니다. 잠시 후 다시 시도해 주세요.",
-    };
-  }
-
-  return {
-    status: 500,
-    code: "openai_request_failed",
-    message: "이미지 생성 요청을 처리하지 못했습니다. 입력 내용을 확인해 주세요.",
-  };
 }
 
 export async function GET() {
@@ -158,149 +67,145 @@ export async function GET() {
     ok: true,
     hasOpenAIKey: Boolean(process.env.OPENAI_API_KEY),
     imageModel: getImageModel(),
+    textModel: getTextModel(),
   });
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.OPENAI_API_KEY) {
+  const client = getOpenAIClient();
+
+  if (!client) {
     return NextResponse.json(
       {
         success: false,
         code: "missing_api_key",
-        error: missingApiKeyError,
+        error: appCopy.serverErrors.missingApiKey,
       },
       { status: 500 },
     );
   }
 
-  const body = (await request.json()) as GenerateImageRequest;
-  const uploadedImageDataUrls =
-    body.uploadedImageBase64s?.slice(0, generationConfig.maxUploadImageCount) ??
-    (body.uploadedImageBase64 ? [body.uploadedImageBase64] : []);
-  const uploadedImages = uploadedImageDataUrls
-    .map((dataUrl) => parseDataUrl(dataUrl))
-    .filter((image): image is NonNullable<ReturnType<typeof parseDataUrl>> =>
-      Boolean(image),
-    );
-  const prompt = (body.prompt ?? body.studentDescription)?.trim() ?? "";
-  const selectedStyle = getStylePreset(body.styleId ?? "none");
-  const productName = body.productName?.trim() ?? "";
-  const productDetailDescription = body.productDetailDescription?.trim() ?? "";
-  const imageSize = selectedStyle?.forcedImageSize ?? getImageSize(body.imageSize);
-
-  if (uploadedImages.length !== uploadedImageDataUrls.length) {
-    return NextResponse.json(
-      { success: false, error: "Unsupported image data." },
-      { status: 400 },
-    );
-  }
-
-  if (
-    uploadedImages.some(
-      (image) => !generationConfig.acceptedMimeTypes.includes(image.mimeType as never),
-    )
-  ) {
-    return NextResponse.json(
-      { success: false, error: "Unsupported image type." },
-      { status: 400 },
-    );
-  }
+  const body = (await request.json().catch(() => null)) as GenerationRequest | null;
+  const prompt = body?.prompt?.trim() ?? "";
+  const requestedReferences = body?.references ?? [];
+  const imageSize = resolveImageSize(body?.imageSize);
 
   if (!prompt) {
     return NextResponse.json(
-      { success: false, error: "Prompt is required." },
+      { success: false, error: appCopy.serverErrors.promptRequired },
       { status: 400 },
     );
   }
 
-  if (!selectedStyle) {
+  if (prompt.length > generationConfig.maxPromptLength) {
     return NextResponse.json(
-      { success: false, error: "Selected style is invalid." },
+      { success: false, error: appCopy.serverErrors.promptTooLong },
       { status: 400 },
     );
   }
 
-  if (selectedStyle.requiresProductName && !productName) {
+  if (requestedReferences.length > uploadConfig.maxReferenceCount) {
     return NextResponse.json(
-      { success: false, error: "제품명을 입력해 주세요." },
+      {
+        success: false,
+        error: fillCopy(appCopy.serverErrors.tooManyReferences, {
+          count: uploadConfig.maxReferenceCount,
+        }),
+      },
       { status: 400 },
     );
   }
 
-  if (selectedStyle.requiresProductDetail && !productDetailDescription) {
-    return NextResponse.json(
-      { success: false, error: "제품의 재료와 기능을 입력해 주세요." },
-      { status: 400 },
-    );
-  }
-
-  const imageBuffers = uploadedImages.map((image) =>
-    Buffer.from(image.base64, "base64"),
-  );
-
-  if (
-    imageBuffers.some(
-      (imageBuffer) => imageBuffer.byteLength > generationConfig.maxFileSizeBytes,
-    )
-  ) {
-    return NextResponse.json(
-      { success: false, error: "Image file is too large." },
-      { status: 400 },
-    );
-  }
-
-  const imageModel = getImageModel();
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
+  const references: PromptReference[] = [];
+  const imageInputs = [];
 
   try {
-    const imageFiles = await Promise.all(
-      imageBuffers.map((imageBuffer, index) =>
-        toFile(
-          imageBuffer,
-          `user-upload-${index + 1}.${getImageExtension(uploadedImages[index].mimeType)}`,
-          { type: uploadedImages[index].mimeType },
-        ),
-      ),
-    );
-    const styleReferenceFiles = await getStyleReferenceFiles(
-      selectedStyle.referenceImages,
-    );
-    const imageInputs = [
-      ...imageFiles,
-      ...styleReferenceFiles,
-    ];
+    for (const [index, reference] of requestedReferences.entries()) {
+      const note = (reference.note ?? "").slice(0, generationConfig.maxNoteLength);
 
-    if (imageInputs.length > generationConfig.maxInputImageCount) {
+      if (reference.kind === "library") {
+        const preset = reference.presetId
+          ? getLibraryPreset(reference.presetId)
+          : undefined;
+
+        if (!preset) {
+          return NextResponse.json(
+            { success: false, error: appCopy.serverErrors.presetNotFound },
+            { status: 400 },
+          );
+        }
+
+        references.push({
+          kind: "library",
+          label: preset.name,
+          note,
+          presetId: preset.id,
+        });
+        imageInputs.push(
+          await readLibraryImage(preset.image, `reference-${index + 1}`),
+        );
+        continue;
+      }
+
+      if (!reference.dataUrl) {
+        return NextResponse.json(
+          { success: false, error: appCopy.serverErrors.uploadUnreadable },
+          { status: 400 },
+        );
+      }
+
+      references.push({
+        kind: "upload",
+        label:
+          reference.label ||
+          fillCopy(appCopy.serverErrors.uploadFallbackLabel, { index: index + 1 }),
+        note,
+      });
+      imageInputs.push(
+        await readUploadedImage(reference.dataUrl, `reference-${index + 1}`),
+      );
+    }
+  } catch (error) {
+    // Only messages written for students may reach the screen.
+    if (error instanceof UserFacingError) {
       return NextResponse.json(
-        { success: false, error: "Too many reference images." },
+        { success: false, error: error.message },
         { status: 400 },
       );
     }
 
-    const imagePrompt = buildImagePrompt(selectedStyle, prompt, {
-      hasUploadedImage: imageFiles.length > 0,
-      hasReferenceImages: selectedStyle.referenceImages.length > 0,
-      productDetailDescription,
-      productName,
-    });
+    console.error("Failed to prepare reference images", error);
 
-    const result =
-      imageInputs.length > 0
-        ? await openai.images.edit({
-            image: imageInputs,
-            model: imageModel,
-            output_format: "png",
-            prompt: imagePrompt,
-            size: imageSize,
-          })
-        : await openai.images.generate({
-            model: imageModel,
-            output_format: "png",
-            prompt: imagePrompt,
-            size: imageSize,
-          });
+    return NextResponse.json(
+      { success: false, error: appCopy.serverErrors.referenceUnavailable },
+      { status: 500 },
+    );
+  }
+
+  if (imageInputs.length > generationConfig.maxInputImageCount) {
+    return NextResponse.json(
+      { success: false, error: appCopy.serverErrors.tooManyInputs },
+      { status: 400 },
+    );
+  }
+
+  const enhanced = await enhancePrompt(client, prompt, references);
+
+  try {
+    const result = imageInputs.length
+      ? await client.images.edit({
+          image: imageInputs,
+          model: getImageModel(),
+          output_format: "png",
+          prompt: enhanced.prompt,
+          size: imageSize,
+        })
+      : await client.images.generate({
+          model: getImageModel(),
+          output_format: "png",
+          prompt: enhanced.prompt,
+          size: imageSize,
+        });
     const imageBase64 = result.data?.[0]?.b64_json;
 
     if (!imageBase64) {
@@ -311,21 +216,18 @@ export async function POST(request: NextRequest) {
       success: true,
       imageBase64,
       mimeType: "image/png",
+      // Not shown in the UI; kept so a teacher can see in devtools what the
+      // model was actually asked for.
+      enhancedPrompt: enhanced.prompt,
+      enhancerFallback: enhanced.fallback,
     });
   } catch (error) {
-    console.error("Image generation failed", {
-      model: imageModel,
-      error,
-    });
-    const openAIError = getOpenAIErrorMessage(error);
+    console.error("Image generation failed", { model: getImageModel(), error });
+    const described = describeOpenAIError(error);
 
     return NextResponse.json(
-      {
-        success: false,
-        code: openAIError.code,
-        error: openAIError.message,
-      },
-      { status: openAIError.status },
+      { success: false, code: described.code, error: described.message },
+      { status: described.status },
     );
   }
 }

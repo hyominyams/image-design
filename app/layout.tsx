@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { appCopy } from "@/lib/appContent";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,18 +17,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="ko"
-      className="h-full antialiased"
-    >
-      <body
-        className="min-h-full flex flex-col"
-        style={{
-          fontFamily:
-            '"Pretendard Variable", Pretendard, SUIT, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif',
-        }}
-      >
-        {children}
+    <html lang="ko" className="h-full antialiased">
+      <body className="min-h-full font-sans">
+        <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
+        <Toaster position="top-center" richColors />
       </body>
     </html>
   );

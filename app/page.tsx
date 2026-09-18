@@ -1,5 +1,5 @@
-import { ImageGenerationApp } from "@/components/ImageGenerationApp";
+import { SingleViewStudio } from "@/components/studio/SingleViewStudio";
 
 export default function Home() {
-  return <ImageGenerationApp />;
+  return <SingleViewStudio />;
 }
