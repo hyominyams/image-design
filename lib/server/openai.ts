@@ -29,14 +29,15 @@ export function getOpenAIClient() {
   return new OpenAI({ apiKey });
 }
 
-export function getImageModel() {
-  return process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-2";
-}
+/**
+ * Models are fixed in code on purpose, not read from env: the prompts are
+ * tuned for these models, and a stale deploy-time variable must not be able to
+ * silently swap one in production. Change them here and redeploy.
+ */
+export const IMAGE_MODEL = "gpt-image-2.5-sunburst";
 
-/** Model used by the prompt enhancer. Any failure degrades to a local prompt. */
-export function getTextModel() {
-  return process.env.OPENAI_TEXT_MODEL ?? "gpt-5-mini";
-}
+/** Rewrites the student's request. Any failure degrades to a local prompt. */
+export const TEXT_MODEL = "gpt-5-mini";
 
 export function parseDataUrl(dataUrl: string) {
   const match = dataUrl.match(dataUrlPattern);

@@ -12,11 +12,11 @@ import {
 import { getLibraryPreset } from "@/lib/referenceLibrary";
 import {
   describeOpenAIError,
-  getImageModel,
   getOpenAIClient,
-  getTextModel,
+  IMAGE_MODEL,
   readLibraryImage,
   readUploadedImage,
+  TEXT_MODEL,
   UserFacingError,
 } from "@/lib/server/openai";
 import type { GenerationRequest } from "@/lib/types";
@@ -44,7 +44,7 @@ async function enhancePrompt(
 ) {
   try {
     const completion = await client.chat.completions.create({
-      model: getTextModel(),
+      model: TEXT_MODEL,
       messages: [
         { role: "system", content: enhancerSystemPrompt },
         { role: "user", content: buildEnhancerInput(prompt, uploads, design) },
@@ -71,8 +71,8 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     hasOpenAIKey: Boolean(process.env.OPENAI_API_KEY),
-    imageModel: getImageModel(),
-    textModel: getTextModel(),
+    imageModel: IMAGE_MODEL,
+    textModel: TEXT_MODEL,
   });
 }
 
@@ -188,13 +188,13 @@ export async function POST(request: NextRequest) {
     const result = imageInputs.length
       ? await client.images.edit({
           image: imageInputs,
-          model: getImageModel(),
+          model: IMAGE_MODEL,
           output_format: "png",
           prompt: enhanced.prompt,
           size: imageSize,
         })
       : await client.images.generate({
-          model: getImageModel(),
+          model: IMAGE_MODEL,
           output_format: "png",
           prompt: enhanced.prompt,
           size: imageSize,
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
       enhancerFallback: enhanced.fallback,
     });
   } catch (error) {
-    console.error("Image generation failed", { model: getImageModel(), error });
+    console.error("Image generation failed", { model: IMAGE_MODEL, error });
     const described = describeOpenAIError(error);
 
     return NextResponse.json(
