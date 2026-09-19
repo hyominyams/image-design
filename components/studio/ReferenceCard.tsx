@@ -1,9 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- references are data URLs and static tiles */
 "use client";
 
-import { ImageIcon, Sparkles, X } from "lucide-react";
+import { X } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,9 +25,9 @@ type ReferenceCardProps = {
 };
 
 /**
- * One attached picture plus the note that decides how it gets used.
+ * One uploaded picture plus the note that decides how it gets used.
  * The note is the whole point of this card — it is what the prompt enhancer
- * reads to tell "this is my drawing" apart from "copy this style only".
+ * reads to tell "this is my drawing" apart from "copy this colour only".
  */
 export function ReferenceCard({
   reference,
@@ -61,20 +60,12 @@ export function ReferenceCard({
       </div>
 
       <div className="flex min-w-0 items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium" title={reference.label}>
-            {reference.label}
-          </p>
-          <Badge
-            className="mt-1"
-            variant={reference.kind === "library" ? "secondary" : "outline"}
-          >
-            {reference.kind === "library" ? <Sparkles /> : <ImageIcon />}
-            {reference.kind === "library"
-              ? appCopy.references.libraryBadge
-              : appCopy.references.uploadBadge}
-          </Badge>
-        </div>
+        <p
+          className="min-w-0 truncate pt-1 text-sm font-medium"
+          title={reference.label}
+        >
+          {reference.label}
+        </p>
 
         <Tooltip>
           <TooltipTrigger asChild>

@@ -14,10 +14,14 @@ export const appCopy = {
   },
   steps: {
     references: {
-      label: "참고 이미지",
+      label: "내 이미지",
       title: "참고할 이미지를 올려 주세요",
       description:
-        "직접 그린 그림, 인터넷에서 찾은 레퍼런스 무엇이든 좋아요. 없어도 괜찮습니다.",
+        "직접 그린 그림이나 찾은 이미지를 올리고, 어떻게 쓸지 적어 주세요. 없어도 괜찮아요.",
+    },
+    design: {
+      label: "디자인",
+      description: "결과물을 어떤 디자인으로 만들지 골라 주세요. 고르지 않아도 돼요.",
     },
     prompt: {
       label: "설명",
@@ -34,8 +38,6 @@ export const appCopy = {
     uploadTitle: "이미지 올리기",
     uploadHint: "클릭하거나 파일을 끌어다 놓으세요",
     uploadMeta: "JPG · PNG · WEBP / 최대 {size} / 최대 {count}장",
-    libraryButton: "레퍼런스 고르기",
-    libraryHint: "올릴 이미지가 없다면 여기서 고르세요",
     emptyTitle: "아직 올린 이미지가 없어요",
     emptyDescription: "이미지 없이 설명만으로 만들 수도 있습니다.",
     noteLabel: "이 이미지를 어떻게 쓸까요?",
@@ -44,8 +46,6 @@ export const appCopy = {
     removeLabel: "이미지 빼기",
     countLabel: "{count}장",
     fallbackLabel: "참고 이미지",
-    uploadBadge: "직접 올림",
-    libraryBadge: "레퍼런스",
     fullTitle: "참고 이미지를 가득 채웠어요",
     fullDescription: "하나를 빼면 더 넣을 수 있어요.",
   },
@@ -58,13 +58,13 @@ export const appCopy = {
     { label: "이 물건이 주인공", note: "이 이미지에 있는 물건이 결과물의 주인공이에요." },
   ],
   library: {
-    title: "레퍼런스 고르기",
+    title: "레퍼런스 디자인",
     description:
-      "올릴 이미지가 없을 때 쓰세요. 고르면 참고 이미지 목록에 그대로 들어갑니다.",
+      "마음에 드는 디자인을 하나 고르세요. 결과물이 이 디자인처럼 만들어져요.",
     searchPlaceholder: "이름으로 찾기",
     empty: "검색 결과가 없어요.",
-    featuredLabel: "많이 쓰는 것",
-    added: "추가됨",
+    selected: "선택됨",
+    openAll: "전체 레퍼런스 보기 ({count}개)",
     close: "닫기",
   },
   prompt: {
@@ -86,7 +86,7 @@ export const appCopy = {
   },
   size: {
     label: "이미지 비율",
-    help: "고른 레퍼런스에 어울리는 비율이 자동으로 맞춰집니다.",
+    help: "고른 디자인에 어울리는 비율이 자동으로 맞춰집니다.",
   },
   actions: {
     generate: "이미지 만들기",
@@ -100,7 +100,7 @@ export const appCopy = {
   startOver: {
     title: "처음부터 다시 할까요?",
     description:
-      "올린 이미지, 이미지별 설명, 프롬프트가 모두 지워지고 되돌릴 수 없어요. 만든 이미지 보관함은 그대로 남아요.",
+      "올린 이미지와 이미지별 설명, 고른 디자인, 프롬프트가 모두 지워지고 되돌릴 수 없어요. 만든 이미지 보관함은 그대로 남아요.",
     cancel: "계속 작업하기",
     confirm: "모두 지우기",
   },
@@ -153,7 +153,6 @@ export const appCopy = {
   toasts: {
     generated: "이미지가 완성됐어요.",
     saved: "내려받기를 시작했어요.",
-    referenceAdded: "참고 이미지에 추가했어요.",
     historyCleared: "저장된 이미지를 모두 지웠어요.",
   },
 } as const;

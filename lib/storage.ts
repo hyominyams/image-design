@@ -83,34 +83,51 @@ function isImageSize(value: unknown): value is DraftState["imageSize"] {
   return imageSizeOptions.some((option) => option.value === value);
 }
 
-function normalizeReference(value: unknown): ReferenceItem | null {
+function normalizeUpload(value: unknown): ReferenceItem | null {
   if (!value || typeof value !== "object") {
     return null;
   }
 
-  const item = value as Partial<ReferenceItem>;
+  const item = value as Partial<ReferenceItem> & { kind?: string };
 
-  if (typeof item.src !== "string" || !item.src) {
-    return null;
-  }
-
-  const kind = item.kind === "library" ? "library" : "upload";
-  const presetId = typeof item.presetId === "string" ? item.presetId : undefined;
-
-  // A draft can outlive the library it referenced. Dropping the entry beats
-  // restoring a card whose image 404s.
-  if (kind === "library" && (!presetId || !getLibraryPreset(presetId))) {
+  // Library picks used to live in this list; they are a design choice now.
+  if (item.kind === "library" || typeof item.src !== "string" || !item.src) {
     return null;
   }
 
   return {
     id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
-    kind,
     src: item.src,
-    label: typeof item.label === "string" ? item.label : appCopy.references.fallbackLabel,
+    label:
+      typeof item.label === "string" ? item.label : appCopy.references.fallbackLabel,
     note: typeof item.note === "string" ? item.note : "",
-    presetId,
   };
+}
+
+/**
+ * Drafts saved before designs were split out kept library picks inside
+ * `references`. Carry the first valid one over as the chosen design.
+ */
+function migrateDesignId(draft: Record<string, unknown>) {
+  if (typeof draft.designId === "string" && getLibraryPreset(draft.designId)) {
+    return draft.designId;
+  }
+
+  const legacy = Array.isArray(draft.references) ? draft.references : [];
+
+  for (const item of legacy) {
+    const legacyItem = (item ?? {}) as { kind?: string; presetId?: unknown };
+
+    if (
+      legacyItem.kind === "library" &&
+      typeof legacyItem.presetId === "string" &&
+      getLibraryPreset(legacyItem.presetId)
+    ) {
+      return legacyItem.presetId;
+    }
+  }
+
+  return null;
 }
 
 export async function loadDraft(): Promise<DraftState | null> {
@@ -124,16 +141,17 @@ export async function loadDraft(): Promise<DraftState | null> {
     return null;
   }
 
-  const draft = record as Partial<DraftState>;
+  const draft = record as Record<string, unknown>;
 
   return {
     prompt: typeof draft.prompt === "string" ? draft.prompt : "",
     imageSize: isImageSize(draft.imageSize) ? draft.imageSize : defaultImageSize,
     references: Array.isArray(draft.references)
       ? draft.references
-          .map(normalizeReference)
+          .map(normalizeUpload)
           .filter((item): item is ReferenceItem => item !== null)
       : [],
+    designId: migrateDesignId(draft),
   };
 }
 

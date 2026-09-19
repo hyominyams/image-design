@@ -25,15 +25,16 @@ import { cn } from "@/lib/utils";
 type LibraryDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Choosing the preset that is already selected clears the choice. */
   onSelect: (preset: LibraryPreset) => void;
-  selectedIds: string[];
+  selectedId: string | null;
 };
 
 export function LibraryDialog({
   open,
   onOpenChange,
   onSelect,
-  selectedIds,
+  selectedId,
 }: LibraryDialogProps) {
   const [query, setQuery] = useState("");
 
@@ -104,10 +105,11 @@ export function LibraryDialog({
 
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {presets.map((preset) => {
-                    const isSelected = selectedIds.includes(preset.id);
+                    const isSelected = preset.id === selectedId;
 
                     return (
                       <button
+                        aria-pressed={isSelected}
                         className={cn(
                           "group ring-border hover:ring-ring focus-visible:ring-ring relative overflow-hidden rounded-xl text-left ring-1 transition focus-visible:ring-2 focus-visible:outline-none",
                           isSelected && "ring-primary ring-2",
@@ -135,7 +137,7 @@ export function LibraryDialog({
                         {isSelected && (
                           <Badge className="absolute top-2 right-2">
                             <Check />
-                            {appCopy.library.added}
+                            {appCopy.library.selected}
                           </Badge>
                         )}
                       </button>

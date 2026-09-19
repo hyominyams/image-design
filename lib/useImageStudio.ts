@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { appCopy, fillCopy } from "@/lib/appContent";
 import { defaultImageSize, uploadConfig, type ImageSize } from "@/lib/config";
-import { getLibraryPreset, type LibraryPreset } from "@/lib/referenceLibrary";
+import { getLibraryPreset } from "@/lib/referenceLibrary";
 import {
   addHistory,
   clearHistory as clearStoredHistory,
@@ -42,13 +42,15 @@ function downloadImage(dataUrl: string) {
  * Every piece of studio state and behaviour.
  *
  * Generations are independent by design: a request carries only the current
- * prompt, ratio and references. A previous result is never sent back to the
- * model — the canvas shows it, and that is all it does.
+ * prompt, ratio, uploads and chosen design. A previous result is never sent
+ * back to the model — the canvas shows it, and that is all it does.
  */
 export function useImageStudio() {
   const hasLoadedDraft = useRef(false);
 
   const [references, setReferences] = useState<ReferenceItem[]>([]);
+  /** A library preset picked as the design direction. No note — see types. */
+  const [designId, setDesignId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [imageSize, setImageSize] = useState<ImageSize>(defaultImageSize);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -72,6 +74,7 @@ export function useImageStudio() {
         setPrompt(draft.prompt);
         setImageSize(draft.imageSize);
         setReferences(draft.references);
+        setDesignId(draft.designId);
       }
 
       setHistory(saved);
@@ -91,12 +94,16 @@ export function useImageStudio() {
       return;
     }
 
-    const draft: DraftState = { prompt, imageSize, references };
+    const draft: DraftState = { prompt, imageSize, references, designId };
     const timeout = window.setTimeout(() => void saveDraft(draft), 400);
 
     return () => window.clearTimeout(timeout);
-  }, [imageSize, prompt, references]);
+  }, [designId, imageSize, prompt, references]);
 
+  const design = useMemo(
+    () => (designId ? (getLibraryPreset(designId) ?? null) : null),
+    [designId],
+  );
   const remainingSlots = uploadConfig.maxReferenceCount - references.length;
   const canGenerate = prompt.trim().length > 0 && !isGenerating;
 
@@ -135,7 +142,6 @@ export function useImageStudio() {
         const added = await Promise.all(
           files.map(async (file) => ({
             id: crypto.randomUUID(),
-            kind: "upload" as const,
             src: await readFileAsDataUrl(file),
             label: file.name,
             note: "",
@@ -150,38 +156,17 @@ export function useImageStudio() {
     [remainingSlots],
   );
 
-  const addLibraryPreset = useCallback(
-    (preset: LibraryPreset) => {
-      if (remainingSlots <= 0) {
-        toast.error(
-          fillCopy(appCopy.errors.tooManyReferences, {
-            count: uploadConfig.maxReferenceCount,
-          }),
-        );
-        return;
-      }
+  // Picking the design that is already chosen clears it.
+  const selectDesign = useCallback((id: string | null) => {
+    const preset = id ? getLibraryPreset(id) : undefined;
 
-      setReferences((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          kind: "library",
-          src: preset.image,
-          label: preset.name,
-          note: preset.defaultNote,
-          presetId: preset.id,
-        },
-      ]);
+    setDesignId((current) => (id === null || current === id ? null : id));
 
-      // Some layouts only read correctly at a specific ratio.
-      if (preset.suggestedSize) {
-        setImageSize(preset.suggestedSize);
-      }
-
-      toast.success(appCopy.toasts.referenceAdded);
-    },
-    [remainingSlots],
-  );
+    // Some layouts only read correctly at a specific ratio.
+    if (preset?.suggestedSize && id !== designId) {
+      setImageSize(preset.suggestedSize);
+    }
+  }, [designId]);
 
   const updateNote = useCallback((id: string, note: string) => {
     setReferences((current) =>
@@ -212,12 +197,11 @@ export function useImageStudio() {
           prompt: trimmed,
           imageSize,
           references: references.map((item) => ({
-            kind: item.kind,
             note: item.note,
             label: item.label,
-            dataUrl: item.kind === "upload" ? item.src : undefined,
-            presetId: item.presetId,
+            dataUrl: item.src,
           })),
+          designId: designId ?? undefined,
         }),
       });
       const result = (await response.json().catch(() => null)) as
@@ -234,7 +218,10 @@ export function useImageStudio() {
         prompt: trimmed,
         imageSize,
         imageUrl: `data:${result.mimeType ?? "image/png"};base64,${result.imageBase64}`,
-        referenceLabels: references.map((reference) => reference.label),
+        referenceLabels: [
+          ...references.map((reference) => reference.label),
+          ...(design ? [design.name] : []),
+        ],
       };
 
       // Set directly, not from the store: without IndexedDB the history comes
@@ -249,7 +236,7 @@ export function useImageStudio() {
     } finally {
       setIsGenerating(false);
     }
-  }, [imageSize, prompt, references]);
+  }, [design, designId, imageSize, prompt, references]);
 
   const download = useCallback(
     (url = resultUrl) => {
@@ -283,24 +270,19 @@ export function useImageStudio() {
 
   const startOver = useCallback(() => {
     setReferences([]);
+    setDesignId(null);
     setPrompt("");
     setImageSize(defaultImageSize);
     setCurrentResult(null);
     setErrorMessage("");
   }, []);
 
-  const referencePresets = useMemo(
-    () =>
-      references
-        .map((item) => (item.presetId ? getLibraryPreset(item.presetId) : null))
-        .filter((preset): preset is LibraryPreset => preset !== null),
-    [references],
-  );
 
   return {
     // state
     references,
-    referencePresets,
+    designId,
+    design,
     prompt,
     imageSize,
     history,
@@ -314,7 +296,7 @@ export function useImageStudio() {
     setPrompt,
     setImageSize,
     addFiles,
-    addLibraryPreset,
+    selectDesign,
     updateNote,
     removeReference,
     generate,

@@ -1,36 +1,32 @@
 import type { ImageSize } from "@/lib/config";
 
 /**
- * A single picture the student put on the table, whatever its origin.
+ * A picture the student uploaded: their own drawing, or something they found.
+ * The `note` is the only thing that tells the model how to use it.
  *
- * Uploads and library picks deliberately share one shape: the only thing that
- * tells the model how to treat a picture is the student's own `note`, not where
- * the file came from.
+ * Library presets are not references — picking one is choosing a design,
+ * so it is a single id with no note (see `DraftState.designId`).
  */
 export type ReferenceItem = {
   id: string;
-  kind: "upload" | "library";
-  /** Data URL for uploads, public path for library picks. */
+  /** Data URL of the uploaded file. */
   src: string;
-  /** File name, or the library preset's Korean name. */
+  /** Original file name. */
   label: string;
-  /** "이 이미지는 내가 그린 손 그림", "이 디자인만 참고" — written by the student. */
+  /** "이 이미지는 내가 그린 손 그림", "색감만 참고" — written by the student. */
   note: string;
-  /** Set for library picks so the server can attach the preset's art direction. */
-  presetId?: string;
 };
 
 export type GenerationRequest = {
   prompt: string;
   imageSize: ImageSize;
   references: {
-    kind: ReferenceItem["kind"];
     note: string;
     label: string;
-    /** Uploads send their data URL; library picks send only the preset id. */
-    dataUrl?: string;
-    presetId?: string;
+    dataUrl: string;
   }[];
+  /** Library preset chosen as the design direction, if any. */
+  designId?: string;
 };
 
 /**
@@ -51,7 +47,7 @@ export type HistoryItem = {
   prompt: string;
   imageSize: ImageSize;
   imageUrl: string;
-  /** Kept so a student can see which references produced a saved result. */
+  /** Upload file names and the design name, kept as a record of the inputs. */
   referenceLabels: string[];
 };
 
@@ -59,4 +55,5 @@ export type DraftState = {
   prompt: string;
   imageSize: ImageSize;
   references: ReferenceItem[];
+  designId: string | null;
 };

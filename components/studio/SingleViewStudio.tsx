@@ -3,11 +3,12 @@
 import { Check, Sparkles } from "lucide-react";
 import { useRef } from "react";
 
+import { DesignPicker } from "@/components/studio/DesignPicker";
 import { HistoryRail } from "@/components/studio/HistoryRail";
 import { PromptComposer } from "@/components/studio/PromptComposer";
-import { ReferencePicker } from "@/components/studio/ReferencePicker";
 import { ResultCanvas } from "@/components/studio/ResultCanvas";
 import { StudioHeader } from "@/components/studio/StudioHeader";
+import { UploadPicker } from "@/components/studio/UploadPicker";
 import {
   Accordion,
   AccordionContent,
@@ -20,9 +21,9 @@ import { cn } from "@/lib/utils";
 import { useImageStudio } from "@/lib/useImageStudio";
 
 /**
- * 시안 B — everything on one screen.
- * The left column keeps the same 1-2 ordering as the stepper, but as accordion
- * sections, so the result stays visible while inputs are edited.
+ * The studio: inputs on the left as ordered accordion sections (my images →
+ * description → design), the result on the right so it stays visible while
+ * inputs change. On narrow screens the two stack.
  */
 export function SingleViewStudio() {
   const studio = useImageStudio();
@@ -30,6 +31,7 @@ export function SingleViewStudio() {
 
   const hasReferences = studio.references.length > 0;
   const hasPrompt = studio.prompt.trim().length > 0;
+  const hasDesign = studio.design !== null;
 
   // When the layout stacks (narrow screens), the result sits below every input,
   // so a student would tap "만들기" and see nothing happen. Bring it into view.
@@ -47,7 +49,7 @@ export function SingleViewStudio() {
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
       <StudioHeader
-        hasUnsavedWork={hasReferences || hasPrompt}
+        hasUnsavedWork={hasReferences || hasPrompt || hasDesign}
         onStartOver={studio.startOver}
       />
 
@@ -57,7 +59,7 @@ export function SingleViewStudio() {
           <div className="flex-1 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
             <Accordion
               className="px-4 sm:px-6"
-              defaultValue={["references", "prompt"]}
+              defaultValue={["references", "prompt", "design"]}
               type="multiple"
             >
               <AccordionItem value="references">
@@ -79,11 +81,11 @@ export function SingleViewStudio() {
                   <p className="text-muted-foreground mb-3 text-xs">
                     {appCopy.steps.references.description}
                   </p>
-                  <ReferencePicker studio={studio} />
+                  <UploadPicker studio={studio} />
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem className="border-b-0" value="prompt">
+              <AccordionItem value="prompt">
                 <AccordionTrigger className="hover:no-underline">
                   <SectionLabel
                     complete={hasPrompt}
@@ -100,6 +102,23 @@ export function SingleViewStudio() {
                     prompt={studio.prompt}
                     showTips={!hasPrompt}
                   />
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem className="border-b-0" value="design">
+                <AccordionTrigger className="hover:no-underline">
+                  <SectionLabel
+                    complete={hasDesign}
+                    index={3}
+                    label={appCopy.steps.design.label}
+                    meta={studio.design?.name ?? appCopy.sections.optional}
+                  />
+                </AccordionTrigger>
+                <AccordionContent>
+                  <p className="text-muted-foreground mb-3 text-xs">
+                    {appCopy.steps.design.description}
+                  </p>
+                  <DesignPicker studio={studio} />
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

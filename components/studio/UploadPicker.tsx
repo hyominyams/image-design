@@ -1,23 +1,21 @@
-/* eslint-disable @next/next/no-img-element -- featured tiles are plain static files */
 "use client";
 
-import { ImagePlus, LibraryBig, Upload } from "lucide-react";
+import { ImagePlus, Upload } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
 
-import { LibraryDialog } from "@/components/studio/LibraryDialog";
 import { ReferenceCard } from "@/components/studio/ReferenceCard";
 import { Button } from "@/components/ui/button";
 import { appCopy, fillCopy } from "@/lib/appContent";
 import { uploadConfig } from "@/lib/config";
-import { featuredPresets } from "@/lib/referenceLibrary";
 import { cn } from "@/lib/utils";
 import type { ImageStudio } from "@/lib/useImageStudio";
 
 /**
- * The whole "put pictures on the table" surface: drop zone, library shortcuts,
- * and the list of attached references with their notes.
+ * The student's own pictures: drop zone plus one card per upload, each with
+ * the note that tells the model how to use it. Library designs live in
+ * DesignPicker and carry no note.
  */
-export function ReferencePicker({
+export function UploadPicker({
   studio,
   className,
 }: {
@@ -26,12 +24,8 @@ export function ReferencePicker({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   const isFull = studio.remainingSlots <= 0;
-  const selectedPresetIds = studio.references
-    .map((item) => item.presetId)
-    .filter((id): id is string => Boolean(id));
 
   // No early return when full: addFiles explains the limit. Returning silently
   // here made a dropped file just vanish.
@@ -69,27 +63,15 @@ export function ReferencePicker({
               })}
         </p>
 
-        <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <Button
-            className="h-10"
-            disabled={isFull}
-            onClick={() => inputRef.current?.click()}
-            size="lg"
-          >
-            <Upload />
-            {appCopy.references.uploadTitle}
-          </Button>
-          <Button
-            className="h-10"
-            disabled={isFull}
-            onClick={() => setIsLibraryOpen(true)}
-            size="lg"
-            variant="outline"
-          >
-            <LibraryBig />
-            {appCopy.references.libraryButton}
-          </Button>
-        </div>
+        <Button
+          className="mt-4 h-10"
+          disabled={isFull}
+          onClick={() => inputRef.current?.click()}
+          size="lg"
+        >
+          <Upload />
+          {appCopy.references.uploadTitle}
+        </Button>
 
         <input
           accept={uploadConfig.acceptAttribute}
@@ -104,36 +86,6 @@ export function ReferencePicker({
         />
       </div>
 
-      {studio.references.length === 0 && (
-        <div>
-          <p className="text-muted-foreground mb-2 text-xs">
-            {appCopy.references.libraryHint}
-          </p>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
-            {featuredPresets.map((preset) => (
-              <button
-                className="group ring-border hover:ring-ring focus-visible:ring-ring overflow-hidden rounded-lg text-left ring-1 transition focus-visible:ring-2 focus-visible:outline-none"
-                key={preset.id}
-                onClick={() => studio.addLibraryPreset(preset)}
-                type="button"
-              >
-                <div className="bg-muted aspect-square overflow-hidden">
-                  <img
-                    alt={preset.name}
-                    className="size-full object-cover transition duration-300 group-hover:scale-105"
-                    loading="lazy"
-                    src={preset.image}
-                  />
-                </div>
-                <p className="line-clamp-2 px-2 py-1.5 text-xs leading-tight font-medium">
-                  {preset.name}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {studio.references.length > 0 && (
         <div className="space-y-3">
           {studio.references.map((reference, index) => (
@@ -147,13 +99,6 @@ export function ReferencePicker({
           ))}
         </div>
       )}
-
-      <LibraryDialog
-        onOpenChange={setIsLibraryOpen}
-        onSelect={studio.addLibraryPreset}
-        open={isLibraryOpen}
-        selectedIds={selectedPresetIds}
-      />
     </div>
   );
 }

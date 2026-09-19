@@ -6,7 +6,8 @@ import {
   buildEnhancerInput,
   buildFallbackPrompt,
   enhancerSystemPrompt,
-  type PromptReference,
+  type PromptDesign,
+  type PromptUpload,
 } from "@/lib/promptBuilder";
 import { getLibraryPreset } from "@/lib/referenceLibrary";
 import {
@@ -38,14 +39,15 @@ function resolveImageSize(value: unknown) {
 async function enhancePrompt(
   client: NonNullable<ReturnType<typeof getOpenAIClient>>,
   prompt: string,
-  references: PromptReference[],
+  uploads: PromptUpload[],
+  design: PromptDesign | null,
 ) {
   try {
     const completion = await client.chat.completions.create({
       model: getTextModel(),
       messages: [
         { role: "system", content: enhancerSystemPrompt },
-        { role: "user", content: buildEnhancerInput(prompt, references) },
+        { role: "user", content: buildEnhancerInput(prompt, uploads, design) },
       ],
     });
     const enhanced = completion.choices[0]?.message?.content?.trim();
@@ -58,7 +60,10 @@ async function enhancePrompt(
   } catch (error) {
     console.warn("Prompt enhancement failed, using the local fallback.", error);
 
-    return { prompt: buildFallbackPrompt(prompt, references), fallback: true };
+    return {
+      prompt: buildFallbackPrompt(prompt, uploads, design),
+      fallback: true,
+    };
   }
 }
 
@@ -89,6 +94,7 @@ export async function POST(request: NextRequest) {
   const prompt = body?.prompt?.trim() ?? "";
   const requestedReferences = body?.references ?? [];
   const imageSize = resolveImageSize(body?.imageSize);
+  const design = body?.designId ? getLibraryPreset(body.designId) : null;
 
   if (!prompt) {
     return NextResponse.json(
@@ -100,6 +106,13 @@ export async function POST(request: NextRequest) {
   if (prompt.length > generationConfig.maxPromptLength) {
     return NextResponse.json(
       { success: false, error: appCopy.serverErrors.promptTooLong },
+      { status: 400 },
+    );
+  }
+
+  if (body?.designId && !design) {
+    return NextResponse.json(
+      { success: false, error: appCopy.serverErrors.presetNotFound },
       { status: 400 },
     );
   }
@@ -116,37 +129,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const references: PromptReference[] = [];
+  const uploads: PromptUpload[] = [];
   const imageInputs = [];
 
   try {
     for (const [index, reference] of requestedReferences.entries()) {
-      const note = (reference.note ?? "").slice(0, generationConfig.maxNoteLength);
-
-      if (reference.kind === "library") {
-        const preset = reference.presetId
-          ? getLibraryPreset(reference.presetId)
-          : undefined;
-
-        if (!preset) {
-          return NextResponse.json(
-            { success: false, error: appCopy.serverErrors.presetNotFound },
-            { status: 400 },
-          );
-        }
-
-        references.push({
-          kind: "library",
-          label: preset.name,
-          note,
-          presetId: preset.id,
-        });
-        imageInputs.push(
-          await readLibraryImage(preset.image, `reference-${index + 1}`),
-        );
-        continue;
-      }
-
       if (!reference.dataUrl) {
         return NextResponse.json(
           { success: false, error: appCopy.serverErrors.uploadUnreadable },
@@ -154,15 +141,21 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      references.push({
-        kind: "upload",
+      uploads.push({
         label:
           reference.label ||
           fillCopy(appCopy.serverErrors.uploadFallbackLabel, { index: index + 1 }),
-        note,
+        note: (reference.note ?? "").slice(0, generationConfig.maxNoteLength),
       });
       imageInputs.push(
-        await readUploadedImage(reference.dataUrl, `reference-${index + 1}`),
+        await readUploadedImage(reference.dataUrl, `image-${index + 1}`),
+      );
+    }
+
+    // The design always goes last, matching its number in the prompt.
+    if (design) {
+      imageInputs.push(
+        await readLibraryImage(design.image, `image-${imageInputs.length + 1}`),
       );
     }
   } catch (error) {
@@ -189,7 +182,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const enhanced = await enhancePrompt(client, prompt, references);
+  const enhanced = await enhancePrompt(client, prompt, uploads, design ?? null);
 
   try {
     const result = imageInputs.length
