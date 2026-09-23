@@ -109,7 +109,7 @@ export const appCopy = {
     emptyTitle: "아직 만든 이미지가 없어요",
     emptyDescription: "왼쪽에서 설명을 쓰고 만들기를 눌러 보세요.",
     loadingTitle: "이미지를 만들고 있어요",
-    loadingDescription: "정밀하게 만드는 모델이라 1~2분 정도 걸릴 수 있어요.",
+    loadingDescription: "보통 20초에서 1분 정도 걸려요.",
   },
   history: {
     title: "만든 이미지",

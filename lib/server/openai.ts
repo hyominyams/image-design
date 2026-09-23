@@ -34,7 +34,7 @@ export function getOpenAIClient() {
  * tuned for these models, and a stale deploy-time variable must not be able to
  * silently swap one in production. Change them here and redeploy.
  */
-export const IMAGE_MODEL = "gpt-image-2.5-sunburst";
+export const IMAGE_MODEL = "gpt-image-2.5-flare";
 
 /** Rewrites the student's request. Any failure degrades to a local prompt. */
 export const TEXT_MODEL = "gpt-5-mini";
