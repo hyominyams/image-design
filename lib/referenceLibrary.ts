@@ -86,11 +86,22 @@ export const libraryPresets: LibraryPreset[] = [
     direction:
       "ecommerce product detail page hero shot, forced wide 16:9 landscape composition, premium product photography, clear main product presence, polished studio styling, generous negative space, refined commercial finish",
   }),
+  // No suggestedSize: a packshot works at any ratio, so the student picks it.
+  preset({
+    id: "product-packshot",
+    name: "제품 단독컷",
+    description: "배경 없이 제품만 보여주는 누끼컷",
+    group: "product",
+    featured: true,
+    direction:
+      "ecommerce product packshot, the product alone on a seamless pure white background, no props, no scene, no surface edge, whole product fully visible and centered with even margins that fit the requested canvas ratio, soft even studio lighting, subtle contact shadow only, true-to-life color and material, crisp catalog-ready edges",
+  }),
   preset({
     id: "product-in-use-shot",
     name: "사용 장면컷",
     description: "제품이 실제로 쓰이는 생활 장면",
     group: "product",
+    featured: true,
     direction:
       "realistic product-in-use scene, the product naturally used in context, believable scale, clean surroundings, natural interaction, clear product visibility",
   }),
@@ -133,7 +144,6 @@ export const libraryPresets: LibraryPreset[] = [
     name: "설계도 드로잉",
     description: "정밀한 선과 도면 구도",
     group: "graphic",
-    featured: true,
     direction:
       "technical blueprint drawing style, precise thin blue ink linework, orthographic and perspective views, construction lines, clean drafting paper texture",
   }),
@@ -142,7 +152,6 @@ export const libraryPresets: LibraryPreset[] = [
     name: "실사 화보",
     description: "자연광과 선명한 디테일",
     group: "photo",
-    featured: true,
     direction:
       "photorealistic editorial photography, natural light, refined composition, real-world textures",
   }),

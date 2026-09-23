@@ -24,8 +24,9 @@ export function DesignPicker({
 }) {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
-  // Keep the grid the same size: a design chosen from the full library takes
-  // the first slot so the current choice is always visible here.
+  // Keep the grid the same size and the product cuts in front: a design chosen
+  // from the full library takes the first slot after them, so the current
+  // choice is always visible here.
   const tiles = useMemo(() => {
     const chosen = studio.design;
 
@@ -33,7 +34,10 @@ export function DesignPicker({
       return featuredPresets;
     }
 
-    return [chosen, ...featuredPresets.slice(0, featuredPresets.length - 1)];
+    const pinned = featuredPresets.filter((preset) => preset.group === "product");
+    const rest = featuredPresets.filter((preset) => preset.group !== "product");
+
+    return [...pinned, chosen, ...rest.slice(0, -1)];
   }, [studio.design]);
 
   return (
