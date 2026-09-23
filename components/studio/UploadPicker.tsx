@@ -58,7 +58,7 @@ export function UploadPicker({
           {isFull
             ? appCopy.references.fullDescription
             : fillCopy(appCopy.references.uploadMeta, {
-                size: uploadConfig.maxFileSizeLabel,
+                size: uploadConfig.maxSourceFileLabel,
                 count: uploadConfig.maxReferenceCount,
               })}
         </p>

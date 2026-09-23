@@ -91,6 +91,7 @@ export const appCopy = {
   actions: {
     generate: "이미지 만들기",
     generating: "만드는 중...",
+    queued: "순서 기다리는 중...",
     regenerate: "다시 만들기",
     download: "내려받기",
     next: "다음",
@@ -110,6 +111,13 @@ export const appCopy = {
     emptyDescription: "왼쪽에서 설명을 쓰고 만들기를 눌러 보세요.",
     loadingTitle: "이미지를 만들고 있어요",
     loadingDescription: "보통 20초에서 1분 정도 걸려요.",
+    queuedTitle: "순서를 기다리고 있어요",
+    queuedDescription:
+      "지금 친구들이 먼저 만들고 있어요. 순서가 되면 자동으로 시작되니 이 화면을 그대로 두세요.",
+    queuedCountdown: "{seconds}초 뒤에 다시 시도해요",
+    queuedRetrying: "지금 다시 시도하는 중...",
+    queuedAttempt: "{count}번째 시도",
+    queuedCancel: "기다리지 않고 취소",
   },
   history: {
     title: "만든 이미지",
@@ -125,6 +133,8 @@ export const appCopy = {
     invalidFileType: "JPG, PNG, WEBP 형식만 올릴 수 있어요.",
     readFailed: "이미지를 읽지 못했어요. 다른 파일로 시도해 주세요.",
     generationFailed: "이미지 생성에 실패했어요. 잠시 후 다시 시도해 주세요.",
+    queueTimedOut:
+      "기다렸는데도 순서가 오지 않았어요. 잠시 뒤에 다시 만들어 주세요.",
   },
   /** Returned by the API route; shown to the student verbatim. */
   serverErrors: {
@@ -147,6 +157,8 @@ export const appCopy = {
     forbidden: "이미지 생성 권한을 확인해 주세요. OpenAI 프로젝트 설정이 필요합니다.",
     modelNotFound: "이미지 생성 모델을 찾을 수 없어요. 모델 설정을 확인해 주세요.",
     rateLimited: "요청이 몰리고 있어요. 잠시 후 다시 시도해 주세요.",
+    quotaExhausted:
+      "이번 달 이미지 생성 한도를 다 썼어요. 선생님께 알려 주세요.",
     upstreamUnavailable: "이미지 생성 서버가 불안정해요. 잠시 후 다시 시도해 주세요.",
     requestFailed: "요청을 처리하지 못했어요. 입력 내용을 확인해 주세요.",
   },
@@ -154,6 +166,7 @@ export const appCopy = {
     generated: "이미지가 완성됐어요.",
     saved: "내려받기를 시작했어요.",
     historyCleared: "저장된 이미지를 모두 지웠어요.",
+    queueCancelled: "기다리기를 멈췄어요.",
   },
 } as const;
 

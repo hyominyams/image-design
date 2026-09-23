@@ -11,10 +11,20 @@ export type ImageSize = (typeof imageSizeOptions)[number]["value"];
 export const defaultImageSize: ImageSize = "1024x1024";
 
 export const uploadConfig = {
-  /** Files a student may attach. Library picks share the same budget. */
+  /** Pictures a student may attach. */
   maxReferenceCount: 6,
-  maxFileSizeBytes: 5 * 1024 * 1024,
-  maxFileSizeLabel: "5MB",
+  /** What they may pick: phone photos are several MB straight out of camera. */
+  maxSourceFileBytes: 12 * 1024 * 1024,
+  maxSourceFileLabel: "12MB",
+  /**
+   * The browser shrinks every picture before sending. Vercel refuses request
+   * bodies over 4.5MB and base64 adds a third on top, so six pictures have to
+   * fit comfortably inside that: 6 x 400KB ≈ 3.2MB once encoded.
+   */
+  maxImageEdge: 1280,
+  targetUploadBytes: 400 * 1024,
+  /** Server-side guard for a single picture, after the browser shrank it. */
+  maxUploadBytes: 1024 * 1024,
   acceptedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
   get acceptAttribute() {
     return this.acceptedMimeTypes.join(",");
@@ -29,6 +39,25 @@ export const generationConfig = {
   maxPromptLength: 1200,
   maxNoteLength: 240,
   maxHistoryCount: 12,
+} as const;
+
+/**
+ * When a class all presses at once, OpenAI refuses the extra requests with a
+ * rate limit. Rather than failing, the browser waits and retries: the wait
+ * happens here, not in a server function that would time out.
+ */
+export const queueConfig = {
+  /** Give up only after this long. */
+  maxWaitMs: 5 * 60 * 1000,
+  /**
+   * Tuned for tier 3 (50 images per minute), where a class of ~30 rarely hits
+   * the limit at all, and the allowance refills within the minute when it
+   * does — so waits are seconds, not the minutes a low tier would need.
+   */
+  minRetryMs: 3_000,
+  maxRetryMs: 20_000,
+  /** Spread retries so a class that pressed together doesn't collide again. */
+  jitterMs: 3_000,
 } as const;
 
 export const storageKeys = {

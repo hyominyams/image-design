@@ -136,11 +136,13 @@ export function SingleViewStudio() {
               size="lg"
             >
               <Sparkles />
-              {studio.isGenerating
-                ? appCopy.actions.generating
-                : studio.resultUrl
-                  ? appCopy.actions.regenerate
-                  : appCopy.actions.generate}
+              {studio.isQueued
+                ? appCopy.actions.queued
+                : studio.isGenerating
+                  ? appCopy.actions.generating
+                  : studio.resultUrl
+                    ? appCopy.actions.regenerate
+                    : appCopy.actions.generate}
             </Button>
           </div>
         </div>

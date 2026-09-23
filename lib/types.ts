@@ -38,7 +38,9 @@ export type GenerationResponse = {
   imageBase64?: string;
   mimeType?: string;
   error?: string;
+  /** "rate_limited" means the browser should wait and try the same request again. */
   code?: string;
+  retryAfterSeconds?: number;
 };
 
 export type HistoryItem = {

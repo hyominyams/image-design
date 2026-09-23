@@ -185,20 +185,29 @@ export async function POST(request: NextRequest) {
   const enhanced = await enhancePrompt(client, prompt, uploads, design ?? null);
 
   try {
+    // maxRetries: 0 so a rate limit comes back immediately. The browser queues
+    // and retries with jitter; retrying inside the function would just burn the
+    // request's time budget while the whole class collides on the same second.
     const result = imageInputs.length
-      ? await client.images.edit({
-          image: imageInputs,
-          model: IMAGE_MODEL,
-          output_format: "png",
-          prompt: enhanced.prompt,
-          size: imageSize,
-        })
-      : await client.images.generate({
-          model: IMAGE_MODEL,
-          output_format: "png",
-          prompt: enhanced.prompt,
-          size: imageSize,
-        });
+      ? await client.images.edit(
+          {
+            image: imageInputs,
+            model: IMAGE_MODEL,
+            output_format: "png",
+            prompt: enhanced.prompt,
+            size: imageSize,
+          },
+          { maxRetries: 0 },
+        )
+      : await client.images.generate(
+          {
+            model: IMAGE_MODEL,
+            output_format: "png",
+            prompt: enhanced.prompt,
+            size: imageSize,
+          },
+          { maxRetries: 0 },
+        );
     const imageBase64 = result.data?.[0]?.b64_json;
 
     if (!imageBase64) {
@@ -219,7 +228,12 @@ export async function POST(request: NextRequest) {
     const described = describeOpenAIError(error);
 
     return NextResponse.json(
-      { success: false, code: described.code, error: described.message },
+      {
+        success: false,
+        code: described.code,
+        error: described.message,
+        retryAfterSeconds: described.retryAfterSeconds,
+      },
       { status: described.status },
     );
   }

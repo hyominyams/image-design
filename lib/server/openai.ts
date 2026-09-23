@@ -102,10 +102,12 @@ export async function readUploadedImage(dataUrl: string, fileName: string) {
 
   const buffer = Buffer.from(parsed.base64, "base64");
 
-  if (buffer.byteLength > uploadConfig.maxFileSizeBytes) {
+  // The browser shrinks pictures before sending, so this only catches a
+  // request that skipped it.
+  if (buffer.byteLength > uploadConfig.maxUploadBytes) {
     throw new UserFacingError(
       fillCopy(appCopy.serverErrors.uploadTooLarge, {
-        size: uploadConfig.maxFileSizeLabel,
+        size: uploadConfig.maxSourceFileLabel,
       }),
     );
   }
@@ -115,7 +117,33 @@ export async function readUploadedImage(dataUrl: string, fileName: string) {
   });
 }
 
-export function describeOpenAIError(error: unknown) {
+/**
+ * How long OpenAI asked us to wait, in seconds. The browser uses this to time
+ * its retry instead of guessing.
+ */
+function readRetryAfterSeconds(error: APIError) {
+  const headers = error.headers as unknown;
+  const get = (name: string) => {
+    if (headers instanceof Headers) return headers.get(name);
+    if (headers && typeof headers === "object") {
+      return (headers as Record<string, string | undefined>)[name] ?? null;
+    }
+    return null;
+  };
+  const seconds = Number(get("retry-after"));
+
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : undefined;
+}
+
+type OpenAIErrorDescription = {
+  status: number;
+  code: string;
+  message: string;
+  /** Only set for a rate limit the caller may retry. */
+  retryAfterSeconds?: number;
+};
+
+export function describeOpenAIError(error: unknown): OpenAIErrorDescription {
   if (!(error instanceof APIError)) {
     return {
       status: 500,
@@ -157,10 +185,21 @@ export function describeOpenAIError(error: unknown) {
   }
 
   if (error.status === 429) {
+    // A spent budget also returns 429, but waiting will never clear it — the
+    // student must not be parked in the queue forever.
+    if (error.code === "insufficient_quota") {
+      return {
+        status: 429,
+        code: "insufficient_quota",
+        message: appCopy.serverErrors.quotaExhausted,
+      };
+    }
+
     return {
       status: 429,
       code: "rate_limited",
       message: appCopy.serverErrors.rateLimited,
+      retryAfterSeconds: readRetryAfterSeconds(error),
     };
   }
 
