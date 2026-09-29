@@ -4,8 +4,10 @@ import type { ImageSize } from "@/lib/config";
  * Reference library.
  *
  * Picking a preset is choosing a design direction for the result. It has no
- * note: the student describes only their own uploads. The preset's tile is
- * still sent to the image model, as a style/presentation sample.
+ * note: the student describes only their own uploads. Only the preset's
+ * `direction` text reaches the model. The tile is a preview for the student and
+ * is never attached: an attached picture pulls its subject (the sample lamp,
+ * the sample character) into the result no matter what the prompt says.
  */
 
 export type LibraryGroupId =
@@ -56,9 +58,9 @@ export type LibraryPreset = {
   /** One short line a student can scan quickly. */
   description: string;
   group: LibraryGroupId;
-  /** English art direction handed to the prompt builder. */
+  /** English art direction; the only part of a preset the model sees. */
   direction: string;
-  /** Public path; also uploaded to the image model as a style reference. */
+  /** Public path of the preview tile. Shown to students, never sent to the model. */
   image: string;
   /** Surfaced in the inline shortcut strip, outside the full library dialog. */
   featured?: boolean;

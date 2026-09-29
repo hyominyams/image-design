@@ -34,8 +34,6 @@ export const uploadConfig = {
 export const generationConfig = {
   /** Upper bound the image model accepts in a single edit call. */
   maxInputImageCount: 16,
-  /** Guard against shipping an oversized library tile to the model. */
-  maxLibraryImageBytes: 512 * 1024,
   maxPromptLength: 1200,
   maxNoteLength: 240,
   maxHistoryCount: 12,

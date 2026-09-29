@@ -14,7 +14,6 @@ import {
   describeOpenAIError,
   getOpenAIClient,
   IMAGE_MODEL,
-  readLibraryImage,
   readUploadedImage,
   TEXT_MODEL,
   UserFacingError,
@@ -149,13 +148,6 @@ export async function POST(request: NextRequest) {
       });
       imageInputs.push(
         await readUploadedImage(reference.dataUrl, `image-${index + 1}`),
-      );
-    }
-
-    // The design always goes last, matching its number in the prompt.
-    if (design) {
-      imageInputs.push(
-        await readLibraryImage(design.image, `image-${imageInputs.length + 1}`),
       );
     }
   } catch (error) {

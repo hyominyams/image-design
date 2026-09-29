@@ -1,9 +1,7 @@
-import { readFile, stat } from "node:fs/promises";
-import { join, normalize, sep } from "node:path";
 import OpenAI, { APIError, toFile } from "openai";
 
 import { appCopy, fillCopy } from "@/lib/appContent";
-import { generationConfig, uploadConfig } from "@/lib/config";
+import { uploadConfig } from "@/lib/config";
 
 export const dataUrlPattern = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/;
 
@@ -53,40 +51,6 @@ export function getImageExtension(mimeType: string) {
   if (mimeType === "image/jpeg") return "jpg";
   if (mimeType === "image/webp") return "webp";
   return "png";
-}
-
-function getMimeTypeFromPath(filePath: string) {
-  if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
-    return "image/jpeg";
-  }
-  if (filePath.endsWith(".webp")) return "image/webp";
-  return "image/png";
-}
-
-/** Reads a bundled library tile out of `public/`, refusing anything outside it. */
-export async function readLibraryImage(publicPath: string, fileName: string) {
-  const publicRoot = join(process.cwd(), "public");
-  const resolved = normalize(join(publicRoot, publicPath.replace(/^\/+/, "")));
-
-  if (!resolved.startsWith(publicRoot + sep)) {
-    // A path outside public/ means tampered input or a broken preset; log it,
-    // but tell the student only that the reference was unavailable.
-    console.error("Reference path escapes the public directory", publicPath);
-    throw new UserFacingError(appCopy.serverErrors.referenceUnavailable);
-  }
-
-  const stats = await stat(resolved);
-
-  if (stats.size > generationConfig.maxLibraryImageBytes) {
-    console.error("Library reference exceeds the size limit", publicPath);
-    throw new UserFacingError(appCopy.serverErrors.referenceUnavailable);
-  }
-
-  const mimeType = getMimeTypeFromPath(resolved);
-
-  return toFile(await readFile(resolved), `${fileName}.${getImageExtension(mimeType)}`, {
-    type: mimeType,
-  });
 }
 
 export async function readUploadedImage(dataUrl: string, fileName: string) {
