@@ -23,7 +23,7 @@ const steps: EncodeStep[] = [
   { edge: 896, quality: 0.6 },
 ];
 
-async function loadImage(file: File) {
+async function loadImage(file: Blob) {
   if (typeof createImageBitmap === "function") {
     try {
       return await createImageBitmap(file);
@@ -80,7 +80,7 @@ function byteLength(dataUrl: string) {
   return Math.ceil((dataUrl.length - dataUrl.indexOf(",") - 1) * 0.75);
 }
 
-export async function prepareUpload(file: File) {
+export async function prepareUpload(file: Blob) {
   const source = await loadImage(file);
   let smallest = "";
 
@@ -99,4 +99,18 @@ export async function prepareUpload(file: File) {
   }
 
   return smallest;
+}
+
+/**
+ * Drafts saved before uploads were shrunk (before 2026-09-23) still hold the
+ * original photo, and restoring one would push the request past Vercel's
+ * limit again. Anything above the target goes through the same shrink; a
+ * picture this module already produced is under it, so this is a no-op then.
+ */
+export async function shrinkIfOversized(dataUrl: string) {
+  if (byteLength(dataUrl) <= uploadConfig.targetUploadBytes) {
+    return dataUrl;
+  }
+
+  return prepareUpload(await (await fetch(dataUrl)).blob());
 }

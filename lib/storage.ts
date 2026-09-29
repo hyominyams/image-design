@@ -167,7 +167,8 @@ export async function clearDraft() {
   );
 }
 
-export async function loadHistory(): Promise<HistoryItem[]> {
+/** Every stored result, newest first. */
+async function loadAllHistory(): Promise<HistoryItem[]> {
   const records = await runTransaction<unknown[]>(
     dbConfig.historyStore,
     "readonly",
@@ -184,8 +185,11 @@ export async function loadHistory(): Promise<HistoryItem[]> {
       const item = record as Partial<HistoryItem>;
       return typeof item.id === "string" && typeof item.imageUrl === "string";
     })
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, generationConfig.maxHistoryCount);
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function loadHistory(): Promise<HistoryItem[]> {
+  return (await loadAllHistory()).slice(0, generationConfig.maxHistoryCount);
 }
 
 export async function addHistory(item: HistoryItem): Promise<HistoryItem[]> {
@@ -193,10 +197,19 @@ export async function addHistory(item: HistoryItem): Promise<HistoryItem[]> {
     store.put(item),
   );
 
-  const history = await loadHistory();
+  // Prune from the full list. Pruning from the capped list found nothing, so
+  // every picture ever made stayed in IndexedDB and was read back in full on
+  // each generation — the device got slower the more a student made.
+  const history = await loadAllHistory();
   const overflow = history.slice(generationConfig.maxHistoryCount);
 
-  await Promise.all(overflow.map((entry) => removeHistory(entry.id)));
+  await Promise.all(
+    overflow.map((entry) =>
+      runTransaction(dbConfig.historyStore, "readwrite", (store) =>
+        store.delete(entry.id),
+      ),
+    ),
+  );
 
   return history.slice(0, generationConfig.maxHistoryCount);
 }

@@ -1,6 +1,6 @@
 import OpenAI, { APIError, toFile } from "openai";
 
-import { appCopy, fillCopy } from "@/lib/appContent";
+import { appCopy } from "@/lib/appContent";
 import { uploadConfig } from "@/lib/config";
 
 export const dataUrlPattern = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/;
@@ -69,11 +69,7 @@ export async function readUploadedImage(dataUrl: string, fileName: string) {
   // The browser shrinks pictures before sending, so this only catches a
   // request that skipped it.
   if (buffer.byteLength > uploadConfig.maxUploadBytes) {
-    throw new UserFacingError(
-      fillCopy(appCopy.serverErrors.uploadTooLarge, {
-        size: uploadConfig.maxSourceFileLabel,
-      }),
-    );
+    throw new UserFacingError(appCopy.serverErrors.uploadTooLarge);
   }
 
   return toFile(buffer, `${fileName}.${getImageExtension(parsed.mimeType)}`, {

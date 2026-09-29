@@ -13,9 +13,12 @@ export const defaultImageSize: ImageSize = "1024x1024";
 export const uploadConfig = {
   /** Pictures a student may attach. */
   maxReferenceCount: 6,
-  /** What they may pick: phone photos are several MB straight out of camera. */
-  maxSourceFileBytes: 12 * 1024 * 1024,
-  maxSourceFileLabel: "12MB",
+  /**
+   * What they may pick. The browser shrinks it anyway, so this only guards
+   * against files too big to decode: 50/200MP phone modes write 15-40MB.
+   */
+  maxSourceFileBytes: 50 * 1024 * 1024,
+  maxSourceFileLabel: "50MB",
   /**
    * The browser shrinks every picture before sending. Vercel refuses request
    * bodies over 4.5MB and base64 adds a third on top, so six pictures have to

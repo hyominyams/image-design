@@ -132,6 +132,8 @@ export const appCopy = {
     fileTooLarge: "이미지는 {size} 이하로 올려 주세요.",
     invalidFileType: "JPG, PNG, WEBP 형식만 올릴 수 있어요.",
     readFailed: "이미지를 읽지 못했어요. 다른 파일로 시도해 주세요.",
+    payloadTooLarge:
+      "올린 이미지 용량이 너무 커요. 이미지를 지우고 다시 올려 주세요.",
     generationFailed: "이미지 생성에 실패했어요. 잠시 후 다시 시도해 주세요.",
     queueTimedOut:
       "기다렸는데도 순서가 오지 않았어요. 잠시 뒤에 다시 만들어 주세요.",
@@ -147,7 +149,7 @@ export const appCopy = {
     presetNotFound: "선택한 레퍼런스를 찾을 수 없어요.",
     uploadUnreadable: "올린 이미지를 읽지 못했어요. 다른 파일로 시도해 주세요.",
     uploadInvalidType: "JPG, PNG, WEBP 형식만 올릴 수 있어요.",
-    uploadTooLarge: "이미지는 {size} 이하로 올려 주세요.",
+    uploadTooLarge: "올린 이미지 용량이 너무 커요. 이미지를 지우고 다시 올려 주세요.",
     referenceUnavailable: "참고 이미지를 준비하지 못했어요. 잠시 후 다시 시도해 주세요.",
     uploadFallbackLabel: "이미지 {index}",
     generic: "이미지를 만드는 중에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.",

@@ -23,6 +23,14 @@ import type { GenerationRequest } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 180;
 
+/**
+ * JPEG, not PNG: the picture goes back as base64 inside JSON, and Vercel caps
+ * response bodies at 4.5MB just like requests. A detailed 1536px PNG runs
+ * 3-4MB, so after base64 it could be cut off after the image was already paid
+ * for. JPEG at this quality is a few hundred KB and looks the same.
+ */
+const outputFormat = { output_format: "jpeg", output_compression: 90 } as const;
+
 function resolveImageSize(value: unknown) {
   return (
     imageSizeOptions.find((option) => option.value === value)?.value ??
@@ -185,7 +193,7 @@ export async function POST(request: NextRequest) {
           {
             image: imageInputs,
             model: IMAGE_MODEL,
-            output_format: "png",
+            ...outputFormat,
             prompt: enhanced.prompt,
             size: imageSize,
           },
@@ -194,7 +202,7 @@ export async function POST(request: NextRequest) {
       : await client.images.generate(
           {
             model: IMAGE_MODEL,
-            output_format: "png",
+            ...outputFormat,
             prompt: enhanced.prompt,
             size: imageSize,
           },
@@ -209,7 +217,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       imageBase64,
-      mimeType: "image/png",
+      mimeType: "image/jpeg",
       // Not shown in the UI; kept so a teacher can see in devtools what the
       // model was actually asked for.
       enhancedPrompt: enhanced.prompt,

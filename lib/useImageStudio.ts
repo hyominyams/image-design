@@ -10,7 +10,7 @@ import {
   uploadConfig,
   type ImageSize,
 } from "@/lib/config";
-import { prepareUpload } from "@/lib/imageUpload";
+import { prepareUpload, shrinkIfOversized } from "@/lib/imageUpload";
 import { getLibraryPreset } from "@/lib/referenceLibrary";
 import {
   addHistory,
@@ -31,7 +31,9 @@ function downloadImage(dataUrl: string) {
   const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15);
   const anchor = document.createElement("a");
   anchor.href = dataUrl;
-  anchor.download = `design-studio-${stamp}.png`;
+  // Older results are PNG, newer ones JPEG.
+  const extension = dataUrl.startsWith("data:image/jpeg") ? "jpg" : "png";
+  anchor.download = `design-studio-${stamp}.${extension}`;
   anchor.click();
 }
 
@@ -89,7 +91,12 @@ export function useImageStudio() {
   const [queue, setQueue] = useState<{ retryAt: number; attempt: number } | null>(
     null,
   );
-  const cancelledRef = useRef(false);
+  /**
+   * Bumped by every generate and by cancel; a run whose id is no longer
+   * current stops. A shared boolean was reset by the next generate, so a
+   * cancelled run could wake up and send its old inputs after all.
+   */
+  const runIdRef = useRef(0);
   const [currentResult, setCurrentResult] = useState<HistoryItem | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -105,9 +112,18 @@ export function useImageStudio() {
       if (cancelled) return;
 
       if (draft) {
+        const references = await Promise.all(
+          draft.references.map(async (item) => ({
+            ...item,
+            src: await shrinkIfOversized(item.src).catch(() => item.src),
+          })),
+        );
+
+        if (cancelled) return;
+
         setPrompt(draft.prompt);
         setImageSize(draft.imageSize);
-        setReferences(draft.references);
+        setReferences(references);
         setDesignId(draft.designId);
       }
 
@@ -223,10 +239,10 @@ export function useImageStudio() {
 
     setIsGenerating(true);
     setErrorMessage("");
-    cancelledRef.current = false;
 
+    const runId = ++runIdRef.current;
     const startedAt = Date.now();
-    const cancelled = () => cancelledRef.current;
+    const cancelled = () => runIdRef.current !== runId;
 
     try {
       // Retry the same request while the API is busy, instead of failing. The
@@ -250,9 +266,15 @@ export function useImageStudio() {
           | GenerationResponse
           | null;
 
-        if (result?.code === "rate_limited") {
-          if (cancelled()) return;
+        if (cancelled()) return;
 
+        // Vercel refuses an oversized body before the route runs, with a
+        // plain-text page rather than our JSON.
+        if (response.status === 413) {
+          throw new Error(appCopy.errors.payloadTooLarge);
+        }
+
+        if (result?.code === "rate_limited") {
           if (Date.now() - startedAt > queueConfig.maxWaitMs) {
             throw new Error(appCopy.errors.queueTimedOut);
           }
@@ -291,19 +313,23 @@ export function useImageStudio() {
         return;
       }
     } catch (error) {
+      if (cancelled()) return;
+
       setErrorMessage(
         error instanceof Error ? error.message : appCopy.errors.generationFailed,
       );
     } finally {
-      setIsGenerating(false);
-      setQueue(null);
-      cancelledRef.current = false;
+      // A newer run owns these now.
+      if (!cancelled()) {
+        setIsGenerating(false);
+        setQueue(null);
+      }
     }
   }, [design, designId, imageSize, prompt, references]);
 
   /** Only offered while queued: a request already in flight is left to finish. */
   const cancelQueue = useCallback(() => {
-    cancelledRef.current = true;
+    runIdRef.current++;
     setQueue(null);
     setIsGenerating(false);
     toast.info(appCopy.toasts.queueCancelled);
